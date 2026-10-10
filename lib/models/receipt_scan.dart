@@ -41,6 +41,7 @@ class ReceiptScan {
   final DateTime capturedAt;
   final bool locationVerified;
   final double distanceMeters;
+  final String reviewStatus; // 'approved', 'pending', 'rejected'
 
   const ReceiptScan({
     required this.id,
@@ -57,11 +58,48 @@ class ReceiptScan {
     required this.capturedAt,
     this.locationVerified = true,
     this.distanceMeters = 24.0,
+    this.reviewStatus = 'pending',
   });
 
   String formattedVolume(int nozzleNum) {
     int ml = nozzleCumVolumeMl[nozzleNum] ?? 0;
     return VolumeFormatter.formatMl(ml);
+  }
+
+  ReceiptScan copyWith({
+    String? id,
+    String? pumpSerialNumber,
+    String? fpId,
+    String? printedDate,
+    String? printedTime,
+    Map<int, int>? nozzleCumVolumeMl,
+    String? imagePath,
+    String? imageHash,
+    ReceiptValidationStatus? validationStatus,
+    String? statusMessage,
+    String? capturedBy,
+    DateTime? capturedAt,
+    bool? locationVerified,
+    double? distanceMeters,
+    String? reviewStatus,
+  }) {
+    return ReceiptScan(
+      id: id ?? this.id,
+      pumpSerialNumber: pumpSerialNumber ?? this.pumpSerialNumber,
+      fpId: fpId ?? this.fpId,
+      printedDate: printedDate ?? this.printedDate,
+      printedTime: printedTime ?? this.printedTime,
+      nozzleCumVolumeMl: nozzleCumVolumeMl ?? this.nozzleCumVolumeMl,
+      imagePath: imagePath ?? this.imagePath,
+      imageHash: imageHash ?? this.imageHash,
+      validationStatus: validationStatus ?? this.validationStatus,
+      statusMessage: statusMessage ?? this.statusMessage,
+      capturedBy: capturedBy ?? this.capturedBy,
+      capturedAt: capturedAt ?? this.capturedAt,
+      locationVerified: locationVerified ?? this.locationVerified,
+      distanceMeters: distanceMeters ?? this.distanceMeters,
+      reviewStatus: reviewStatus ?? this.reviewStatus,
+    );
   }
 
   Map<String, dynamic> toMap() {
@@ -80,6 +118,7 @@ class ReceiptScan {
       'capturedAt': capturedAt.toIso8601String(),
       'locationVerified': locationVerified,
       'distanceMeters': distanceMeters,
+      'reviewStatus': reviewStatus,
     };
   }
 
@@ -89,6 +128,9 @@ class ReceiptScan {
     rawMap.forEach((k, v) {
       parsedMap[int.tryParse(k) ?? 1] = (v as num).toInt();
     });
+
+    final capturedBy = map['capturedBy'] ?? '';
+    final isOwner = capturedBy.toString().toLowerCase().contains('owner');
 
     return ReceiptScan(
       id: map['id'] ?? '',
@@ -104,10 +146,11 @@ class ReceiptScan {
         orElse: () => ReceiptValidationStatus.valid,
       ),
       statusMessage: map['statusMessage'] ?? '',
-      capturedBy: map['capturedBy'] ?? '',
+      capturedBy: capturedBy,
       capturedAt: DateTime.tryParse(map['capturedAt'] ?? '') ?? DateTime.now(),
       locationVerified: map['locationVerified'] ?? true,
       distanceMeters: (map['distanceMeters'] as num?)?.toDouble() ?? 24.0,
+      reviewStatus: map['reviewStatus'] ?? (isOwner ? 'approved' : 'pending'),
     );
   }
 }

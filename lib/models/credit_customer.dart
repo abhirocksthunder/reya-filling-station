@@ -16,6 +16,22 @@ class CreditPayment {
   });
 
   String get formattedAmount => CurrencyFormatter.formatPaise(amountPaise);
+
+  Map<String, dynamic> toMap() => {
+    'id': id,
+    'date': date.toIso8601String(),
+    'amountPaise': amountPaise,
+    'mode': mode,
+    'note': note,
+  };
+
+  factory CreditPayment.fromMap(Map<String, dynamic> map) => CreditPayment(
+    id: map['id'] ?? '',
+    date: DateTime.tryParse(map['date'] ?? '') ?? DateTime.now(),
+    amountPaise: (map['amountPaise'] as num?)?.toInt() ?? 0,
+    mode: map['mode'] ?? 'Cash',
+    note: map['note'],
+  );
 }
 
 class CreditCustomer {
@@ -52,6 +68,27 @@ class CreditCustomer {
       pendingAmountPaise: pendingAmountPaise ?? this.pendingAmountPaise,
       lastCreditDate: lastCreditDate ?? this.lastCreditDate,
       payments: payments ?? this.payments,
+    );
+  }
+
+  Map<String, dynamic> toMap() => {
+    'id': id,
+    'name': name,
+    'subtitle': subtitle,
+    'pendingAmountPaise': pendingAmountPaise,
+    'lastCreditDate': lastCreditDate.toIso8601String(),
+    'payments': payments.map((p) => p.toMap()).toList(),
+  };
+
+  factory CreditCustomer.fromMap(Map<String, dynamic> map) {
+    final rawPayments = map['payments'] as List<dynamic>? ?? [];
+    return CreditCustomer(
+      id: map['id'] ?? '',
+      name: map['name'] ?? '',
+      subtitle: map['subtitle'] ?? '',
+      pendingAmountPaise: (map['pendingAmountPaise'] as num?)?.toInt() ?? 0,
+      lastCreditDate: DateTime.tryParse(map['lastCreditDate'] ?? '') ?? DateTime.now(),
+      payments: rawPayments.map((p) => CreditPayment.fromMap(Map<String, dynamic>.from(p))).toList(),
     );
   }
 }

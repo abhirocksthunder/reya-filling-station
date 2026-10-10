@@ -14,6 +14,9 @@ import 'people_management_screen.dart';
 import 'pump_setup_screen.dart';
 import 'station_settings_screen.dart';
 import 'daily_report_screen.dart';
+import '../../services/app_version_service.dart';
+import '../../widgets/version_footer.dart';
+import '../../widgets/biometric_setup_prompt.dart';
 
 class OwnerShell extends StatefulWidget {
   final VoidCallback? onSwitchToStaffView;
@@ -26,6 +29,18 @@ class OwnerShell extends StatefulWidget {
 
 class _OwnerShellState extends State<OwnerShell> {
   int _selectedNavIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        final state = context.read<StationStateProvider>();
+        AppVersionService.checkAndPromptUpdate(context, state.settings);
+        BiometricSetupPrompt.checkAndShowPrompt(context, state.currentUser);
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -136,6 +151,12 @@ class _OwnerShellState extends State<OwnerShell> {
                 }
               },
             ),
+          ),
+        ),
+        const Padding(
+          padding: EdgeInsets.only(bottom: 12),
+          child: Center(
+            child: VersionFooter(compact: true, color: Colors.white70),
           ),
         ),
       ],

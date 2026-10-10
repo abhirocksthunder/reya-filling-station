@@ -1,5 +1,15 @@
 {
   "projects": {
     "default": "reya-filling-station-chatrai"
-  }
+  },
+  "targets": {
+    "reya-filling-station-chatrai": {
+      "hosting": {
+        "reya-filling-station-chatrai": [
+          "reya-filling-station-chatrai"
+        ]
+      }
+    }
+  },
+  "etags": {}
 }

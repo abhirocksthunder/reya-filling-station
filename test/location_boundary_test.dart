@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:reya_filling_station/models/station_settings.dart';
 import 'package:reya_filling_station/services/location_service.dart';
 
 void main() {
@@ -67,6 +68,56 @@ void main() {
 
       expect(result.state, equals(LocationVerificationState.cannotVerifyLocation));
       expect(result.isEligibleForScan, isFalse);
+    });
+
+    test('5. StationSettings location coordinates and perimeter update correctly', () {
+      const defaultSettings = StationSettings();
+      expect(defaultSettings.latitude, equals(16.5062));
+      expect(defaultSettings.longitude, equals(80.6480));
+
+      final updated = defaultSettings.copyWith(
+        stationName: 'Chatrai Bypass Forecourt',
+        latitude: 16.5085,
+        longitude: 80.6495,
+        radiusMeters: 175.0,
+      );
+
+      expect(updated.stationName, equals('Chatrai Bypass Forecourt'));
+      expect(updated.latitude, equals(16.5085));
+      expect(updated.longitude, equals(80.6495));
+      expect(updated.radiusMeters, equals(175.0));
+    });
+
+    test('6. Geofence evaluation adapts to updated station coordinates', () {
+      const newStationLat = 16.5085;
+      const newStationLon = 80.6495;
+      const newStationRadius = 175.0;
+
+      // Old coordinates (16.5062, 80.6480) are now ~300m away, should fail
+      LocationCheckResult oldPointResult = LocationService.evaluateGeofence(
+        currentLat: 16.5062,
+        currentLon: 80.6480,
+        accuracyMeters: 10.0,
+        stationLat: newStationLat,
+        stationLon: newStationLon,
+        stationRadiusMeters: newStationRadius,
+        locationServicesEnabled: true,
+      );
+      expect(oldPointResult.isEligibleForScan, isFalse);
+      expect(oldPointResult.state, equals(LocationVerificationState.moveCloser));
+
+      // New point close to updated coordinates should pass
+      LocationCheckResult newPointResult = LocationService.evaluateGeofence(
+        currentLat: 16.5086,
+        currentLon: 80.6495,
+        accuracyMeters: 10.0,
+        stationLat: newStationLat,
+        stationLon: newStationLon,
+        stationRadiusMeters: newStationRadius,
+        locationServicesEnabled: true,
+      );
+      expect(newPointResult.isEligibleForScan, isTrue);
+      expect(newPointResult.state, equals(LocationVerificationState.atStation));
     });
   });
 }

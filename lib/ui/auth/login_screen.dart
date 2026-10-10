@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/colors.dart';
 import '../../core/constants/dimensions.dart';
 import '../../models/user_profile.dart';
 import '../../services/station_state_provider.dart';
+import '../../services/app_version_service.dart';
+import '../../widgets/version_footer.dart';
 
 class LoginScreen extends StatefulWidget {
   final Function(UserProfile) onLoginSuccess;
@@ -21,6 +24,17 @@ class _LoginScreenState extends State<LoginScreen> {
   String? _errorMessage;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        final state = context.read<StationStateProvider>();
+        AppVersionService.checkAndPromptUpdate(context, state.settings);
+      }
+    });
+  }
+
+  @override
   void dispose() {
     _identifierController.dispose();
     _pinController.dispose();
@@ -33,10 +47,27 @@ class _LoginScreenState extends State<LoginScreen> {
       _errorMessage = null;
     });
 
-    String query = _identifierController.text.trim().toLowerCase();
+    final query = _identifierController.text.trim().toLowerCase();
+    final enteredPin = _pinController.text.trim();
 
-    // Find user by email or phone number
-    UserProfile? matchedUser = state.allUsers.firstWhere(
+    if (query.isEmpty) {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'Please enter your email or mobile number.';
+      });
+      return;
+    }
+
+    if (enteredPin.isEmpty) {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'Please enter your 4-6 digit Security PIN.';
+      });
+      return;
+    }
+
+    // Find user by email or phone number or name
+    final UserProfile? matchedUser = state.allUsers.firstWhere(
       (u) =>
           u.email.toLowerCase() == query ||
           u.phoneNumber.replaceAll(' ', '') == query.replaceAll(' ', '') ||
@@ -49,10 +80,10 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
 
-    if (matchedUser.id.isEmpty) {
+    if (matchedUser == null || matchedUser.id.isEmpty) {
       setState(() {
         _isLoading = false;
-        _errorMessage = 'Account not found. Please check your email or phone number.';
+        _errorMessage = 'Account not found. Please check your credentials or contact owner.';
       });
       return;
     }
@@ -61,6 +92,14 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() {
         _isLoading = false;
         _errorMessage = 'Account is suspended. Contact station owner.';
+      });
+      return;
+    }
+
+    if (matchedUser.securityPin != enteredPin) {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'Incorrect Security PIN. Please contact station admin if forgotten.';
       });
       return;
     }
@@ -80,7 +119,7 @@ class _LoginScreenState extends State<LoginScreen> {
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 440),
+            constraints: const BoxConstraints(maxWidth: 460),
             child: Container(
               padding: const EdgeInsets.all(28),
               decoration: BoxDecoration(
@@ -109,7 +148,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Station Title (NO "Demo - Sample Data" text!)
+                  // Station Title
                   const Text(
                     'Reya Filling Station',
                     textAlign: TextAlign.center,
@@ -125,7 +164,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     'Chatrai, Andhra Pradesh',
                     style: TextStyle(fontSize: 13, color: StationColors.textLight, fontWeight: FontWeight.w500),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 18),
 
                   // Language Switcher
                   Container(
@@ -143,13 +182,17 @@ class _LoginScreenState extends State<LoginScreen> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 24),
 
-                  // Email or Phone Input
+                  // Email or Phone Input (Max 30 characters)
                   TextField(
                     controller: _identifierController,
+                    maxLength: 30,
+                    inputFormatters: [LengthLimitingTextInputFormatter(30)],
                     decoration: InputDecoration(
                       labelText: 'Email or Mobile Number',
+                      hintText: 'e.g. kalyan@rfs.com or 9848011111',
+                      counterText: '',
                       prefixIcon: const Icon(Icons.person_outline),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
@@ -157,22 +200,30 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // PIN Input
+                  // PIN Input (Max 6 Digits)
                   TextField(
                     controller: _pinController,
                     obscureText: true,
                     keyboardType: TextInputType.number,
+                    maxLength: 6,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(6),
+                    ],
                     decoration: InputDecoration(
-                      labelText: 'Security PIN',
+                      labelText: 'Security PIN (Max 6 Digits)',
+                      hintText: 'Enter 4-6 digit Security PIN',
+                      counterText: '',
                       prefixIcon: const Icon(Icons.lock_outline),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 16),
 
                   if (_errorMessage != null) ...[
                     Container(
+                      width: double.infinity,
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
                         color: StationColors.errorBg,
@@ -186,7 +237,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     const SizedBox(height: 12),
                   ],
 
-                  // Login Button (60px high forecourt target)
+                  // Sign In Button
                   SizedBox(
                     width: double.infinity,
                     height: StationDimensions.primaryButtonHeight,
@@ -205,6 +256,8 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                     ),
                   ),
+                  const SizedBox(height: 20),
+                  const VersionFooter(),
                 ],
               ),
             ),

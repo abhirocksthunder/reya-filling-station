@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/colors.dart';
 import '../../core/constants/dimensions.dart';
@@ -23,6 +24,9 @@ class _MoneyEntriesScreenState extends State<MoneyEntriesScreen> {
   final TextEditingController _phoneController = TextEditingController();
   late final TextEditingController _timeController;
   final TextEditingController _refController = TextEditingController();
+  final TextEditingController _customerNameController = TextEditingController();
+  final TextEditingController _customerSubtitleController = TextEditingController();
+  String? _selectedCreditCustomerId;
 
   @override
   void initState() {
@@ -36,6 +40,8 @@ class _MoneyEntriesScreenState extends State<MoneyEntriesScreen> {
     _phoneController.dispose();
     _timeController.dispose();
     _refController.dispose();
+    _customerNameController.dispose();
+    _customerSubtitleController.dispose();
     super.dispose();
   }
 
@@ -180,9 +186,12 @@ class _MoneyEntriesScreenState extends State<MoneyEntriesScreen> {
                   child: TextField(
                     controller: _amountController,
                     keyboardType: TextInputType.number,
+                    maxLength: 10,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(10)],
                     style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: StationColors.textDark),
                     decoration: const InputDecoration(
                       border: InputBorder.none,
+                      counterText: '',
                       hintText: '0',
                     ),
                   ),
@@ -209,8 +218,11 @@ class _MoneyEntriesScreenState extends State<MoneyEntriesScreen> {
                       TextField(
                         controller: _phoneController,
                         keyboardType: TextInputType.phone,
+                        maxLength: 10,
+                        inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(10)],
                         decoration: InputDecoration(
                           hintText: '10 digits mobile',
+                          counterText: '',
                           filled: true,
                           fillColor: Colors.white,
                           contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -236,8 +248,10 @@ class _MoneyEntriesScreenState extends State<MoneyEntriesScreen> {
                       const SizedBox(height: 6),
                       TextField(
                         controller: _timeController,
+                        maxLength: 15,
                         decoration: InputDecoration(
                           hintText: '12:15 pm',
+                          counterText: '',
                           suffixIcon: const Icon(Icons.access_time, size: 18),
                           filled: true,
                           fillColor: Colors.white,
@@ -256,7 +270,99 @@ class _MoneyEntriesScreenState extends State<MoneyEntriesScreen> {
             const SizedBox(height: 16),
           ],
 
-          // Reference (optional) Field
+          // Conditional Credit Customer Selection & Input (Compulsory when Credit is selected)
+          if (_selectedCategory == EntryCategory.credit) ...[
+            Container(
+              padding: const EdgeInsets.all(14),
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                color: StationColors.creditTeal.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: StationColors.creditTeal.withOpacity(0.3)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: const [
+                      Icon(Icons.person_pin, color: StationColors.creditTeal, size: 20),
+                      SizedBox(width: 8),
+                      Text(
+                        'Credit Customer Details *',
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: StationColors.textDark),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Customer Dropdown if existing customers exist
+                  if (state.creditCustomers.isNotEmpty) ...[
+                    DropdownButtonFormField<String>(
+                      value: _selectedCreditCustomerId ?? (state.creditCustomers.isNotEmpty ? state.creditCustomers.first.id : '__new__'),
+                      decoration: InputDecoration(
+                        labelText: 'Select Customer',
+                        filled: true,
+                        fillColor: Colors.white,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      items: [
+                        ...state.creditCustomers.map((c) => DropdownMenuItem(
+                              value: c.id,
+                              child: Text('${c.name} (${c.formattedPending} due)'),
+                            )),
+                        const DropdownMenuItem(
+                          value: '__new__',
+                          child: Text('+ Add New Customer', style: TextStyle(color: StationColors.primary, fontWeight: FontWeight.bold)),
+                        ),
+                      ],
+                      onChanged: (val) {
+                        setState(() {
+                          _selectedCreditCustomerId = val;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+
+                  // If '__new__' selected or no customers registered yet
+                  if (_selectedCreditCustomerId == '__new__' || state.creditCustomers.isEmpty) ...[
+                    TextField(
+                      controller: _customerNameController,
+                      maxLength: 30,
+                      inputFormatters: [LengthLimitingTextInputFormatter(30)],
+                      decoration: InputDecoration(
+                        labelText: 'New Customer Name *',
+                        hintText: 'e.g. Ramesh Reddy (max 30 chars)',
+                        counterText: '',
+                        filled: true,
+                        fillColor: Colors.white,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: _customerSubtitleController,
+                      maxLength: 30,
+                      inputFormatters: [LengthLimitingTextInputFormatter(30)],
+                      decoration: InputDecoration(
+                        labelText: 'Vehicle / Description (optional)',
+                        hintText: 'e.g. Tractor AP16 XX1234 (max 30 chars)',
+                        counterText: '',
+                        filled: true,
+                        fillColor: Colors.white,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+
+          // Reference (optional) Field (Max 30 characters)
           Text(
             AppStrings.get('referenceOptional', lang),
             style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: StationColors.textMedium),
@@ -264,8 +370,10 @@ class _MoneyEntriesScreenState extends State<MoneyEntriesScreen> {
           const SizedBox(height: 6),
           TextField(
             controller: _refController,
+            maxLength: 30,
             decoration: InputDecoration(
-              hintText: 'e.g. customer name, note',
+              hintText: 'e.g. customer note (max 30 chars)',
+              counterText: '',
               filled: true,
               fillColor: Colors.white,
               contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -303,30 +411,82 @@ class _MoneyEntriesScreenState extends State<MoneyEntriesScreen> {
                   return;
                 }
 
-                final entry = TransactionEntry(
-                  id: 'entry_${DateTime.now().millisecondsSinceEpoch}',
-                  shiftId: state.activeShift.id,
-                  category: _selectedCategory,
-                  direction: _direction,
-                  amountPaise: paise,
-                  phonePeNumber: _selectedCategory == EntryCategory.phonePe ? _phoneController.text : null,
-                  timeString: _timeController.text,
-                  reference: _refController.text.trim().isEmpty ? null : _refController.text.trim(),
-                  createdAt: DateTime.now(),
-                  createdBy: state.currentUser.name,
-                );
+                if (_selectedCategory == EntryCategory.credit) {
+                  String customerName = '';
+                  String subtitle = '';
 
-                state.addTransactionEntry(entry);
+                  final isSelectingExisting = state.creditCustomers.isNotEmpty &&
+                      _selectedCreditCustomerId != '__new__' &&
+                      _selectedCreditCustomerId != null;
 
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Entry saved: ${CurrencyFormatter.formatPaise(paise)} (${_selectedCategory.displayName})'),
-                    backgroundColor: StationColors.successGreen,
-                  ),
-                );
+                  if (isSelectingExisting) {
+                    final existing = state.creditCustomers.firstWhere(
+                      (c) => c.id == _selectedCreditCustomerId,
+                      orElse: () => state.creditCustomers.first,
+                    );
+                    customerName = existing.name;
+                    subtitle = existing.subtitle;
+                  } else {
+                    customerName = _customerNameController.text.trim();
+                    subtitle = _customerSubtitleController.text.trim();
+                  }
+
+                  if (customerName.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Customer name is compulsory for Credit entries.'),
+                        backgroundColor: StationColors.errorRed,
+                      ),
+                    );
+                    return;
+                  }
+
+                  state.recordCreditSale(
+                    customerName: customerName,
+                    subtitle: subtitle,
+                    amountPaise: paise,
+                    reference: _refController.text.trim().isEmpty ? null : _refController.text.trim(),
+                    staffName: state.currentUser.name,
+                  );
+
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Credit recorded for $customerName: ${CurrencyFormatter.formatPaise(paise)}'),
+                      backgroundColor: StationColors.successGreen,
+                    ),
+                  );
+                } else {
+                  final entry = TransactionEntry(
+                    id: 'entry_${DateTime.now().millisecondsSinceEpoch}',
+                    shiftId: state.activeShift.id,
+                    category: _selectedCategory,
+                    direction: _direction,
+                    amountPaise: paise,
+                    phonePeNumber: _selectedCategory == EntryCategory.phonePe ? _phoneController.text : null,
+                    timeString: _timeController.text,
+                    reference: _refController.text.trim().isEmpty ? null : _refController.text.trim(),
+                    createdAt: DateTime.now(),
+                    createdBy: state.currentUser.name,
+                  );
+
+                  state.addTransactionEntry(entry);
+
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Entry saved: ${CurrencyFormatter.formatPaise(paise)} (${_selectedCategory.displayName})'),
+                      backgroundColor: StationColors.successGreen,
+                    ),
+                  );
+                }
 
                 _amountController.clear();
+                _phoneController.clear();
                 _refController.clear();
+                _customerNameController.clear();
+                _customerSubtitleController.clear();
+                setState(() {
+                  _selectedCreditCustomerId = null;
+                });
               },
             ),
           ),
@@ -366,6 +526,14 @@ class _MoneyEntriesScreenState extends State<MoneyEntriesScreen> {
                 itemBuilder: (context, idx) {
                   final item = entries[idx];
                   bool isReceived = item.direction == EntryDirection.received;
+
+                  String? subtitle;
+                  if (item.category == EntryCategory.phonePe && item.phonePeNumber != null && item.phonePeNumber!.isNotEmpty) {
+                    subtitle = 'Mobile: ${item.phonePeNumber!}${item.reference != null && item.reference!.isNotEmpty ? ' • ${item.reference}' : ''}';
+                  } else if (item.reference != null && item.reference!.isNotEmpty) {
+                    subtitle = item.reference!;
+                  }
+
                   return Container(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                     decoration: BoxDecoration(
@@ -393,9 +561,11 @@ class _MoneyEntriesScreenState extends State<MoneyEntriesScreen> {
                                 item.category.displayName,
                                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                               ),
-                              if (item.reference != null && item.reference!.isNotEmpty)
+                              if (subtitle != null && subtitle.isNotEmpty)
                                 Text(
-                                  item.reference!,
+                                  subtitle,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(fontSize: 12, color: StationColors.textLight),
                                 ),
                             ],

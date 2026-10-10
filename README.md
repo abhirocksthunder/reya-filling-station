@@ -21,11 +21,12 @@ A rural-first petrol filling station management, meter reading capture, and fina
    - **Dedicated User Management**: Full-page `UserFormScreen` allowing owners to add and edit users, roles, emails, phone numbers, villages, and addresses. Shift assignment is automatically hidden for Owner roles.
    - **10-Item Pagination Mandate**: `PaginationControl` widget with 44px+ touch targets and range display integrated across People Management, Credit Khata, Receipts Inbox, and Money Ledger.
 
-2. **Hierarchical IndianOil OCR Pipeline**:
+2. **Hardened IndianOil Forecourt OCR Pipeline & Strict Validation Gate**:
    - Automatically parses IndianOil dispenser printout slips (`FP. ID`, `Pump SNo`, `Date: dd/MM/yyyy`, `Time: HH:mm:ss`).
-   - Hierarchically locates `Nozzle NoX`, then extracts its immediate `CumVolume`. Discards intermediate counters (`Shif1Sale`, `ShDayVol`, `CumSale`).
-   - Enforces monotonic counter continuity (`Closing >= Opening`) and SHA-256 fingerprint deduplication.
-   - Automatic business date validation against Asian/Kolkata station time, flagging previous-day slips.
+   - **Multi-Pass Parser**: Normalizes line tokens, fixes optical ambiguities (`O`/`o` -> `0`, `l`/`I` -> `1`, faint decimal points), handles thermal receipt line breaks where `CumVolume:` is followed by numeric value on subsequent lines, and strips stray pen marks (e.g. `/ 274487.190`).
+   - **Strict Intermediate Counter & Sales Exclusion**: Explicitly ignores intermediate counters (`Shif1Sale`, `Shif1Vol`, `Shif2Sale`, `Shif2Vol`, `Shif3Sale`, `Shif3Vol`, `ShDaySale`, `ShDayVol`, `ShMTHSale`, `ShMTHVol`) and forecourt sales rupees (`CumSale`), isolating only cumulative dispensing totalisers (`10,000` to `9,999,999.999 L`).
+   - **In-Browser Tesseract.js OCR Engine**: Enables real client-side OCR directly in Flutter Web using Tesseract.js (v5) with canvas adaptive binarization, eliminating platform dependencies and eradicating silent mock fallbacks.
+   - **Strict Forecourt Gates**: Enforces monotonic counter continuity (`Closing >= Opening`), prevents silent mock fallback on mobile captures, and flags mismatches with explicit `Wrong pump` dialogs.
 
 3. **Exact Integer Paise & Millilitres Calculations**:
    - Zero floating-point drift across platforms. Stored as integer paise (`₹98,146.88` = `9814688` paise) and integer millilitres (`168,676.720 L` = `168676720` mL).
@@ -49,8 +50,52 @@ A rural-first petrol filling station management, meter reading capture, and fina
    - **Interactive Calendar & Shift Selectors**: Functional day stepper `< Date >`, calendar date picker (`showDatePicker`), and shift dropdown across Daily Reports and Shift Reviews.
    - **People Management Filters & Session Tracking**: Real-time search by name, phone, village, and email, alongside Role/Status filters and active session logged-in status chips.
    - **Category Mapping Audit Dialog**: Replaces temporary feedback with an authoritative dialog to inspect and map uncategorized physical ledger debit entries.
+   - **Editable Station Location & Forecourt Perimeter Controls**: Configurable station name, GPS latitude (°N), GPS longitude (°E), and geofence boundary radius (50m–500m) with preset chips (Chatrai Forecourt, Chatrai Bypass) and live coordinates sync to Firestore.
    - **Developer Testing Controls**: Single-click "Seed to Firestore" and "Clear / Purge Collections" buttons with safety alerts for testing operational states.
 
+7. **Production Branding, Hardware Biometrics & Session Continuity**:
+   - **Custom Petrol Dispenser Branding**: Custom high-resolution green dispenser icons generated for Android launcher mipmaps (`ic_launcher.png`), web favicon, and PWA manifests (`Icon-192`, `Icon-512`, `Icon-maskable`).
+   - **Biometric Quick Login (Fingerprint & Face ID)**: Native hardware biometric authentication via `local_auth` and Android `FlutterFragmentActivity`, configurable in Station Settings.
+   - **Real Camera & Gallery Photo Capture**: Direct hardware camera and album photo capture for receipt slips and baseline meter evidence using `image_picker`.
+   - **Persistent Session State**: Active user logins and live user updates persist across page reloads via `SharedPreferences`.
+   - **Multi-Pump Forecourt View**: Staff My Shift screen displays all station pumps (Pump 1 & Pump 2) with both nozzles, yesterday's baseline, and today's reading.
+   - **Dispenser CRUD, Edit Pumps & Baseline Setup**: Full pump management with Add Pump modal, Edit Pump dialog (updating name, serial, nozzle fuel types, rates, and totalisers), pump deletion with safety confirmation, opening baseline setter, and base totaliser photo proof upload.
+
+8. **In-App Versioning & Authoritative APK Force Update Engine**:
+   - **In-App Version Badges**: Ubiquitous `VersionFooter` widget (modeled on `restaurant_pos`) displays current installed version (`v1.0.4+5`) across `LoginScreen`, `StationTopBar` header, and `OwnerShell` sidebar.
+   - **Semantic Version Comparator**: `AppVersionService` accurately evaluates major, minor, patch, and build numbers against target values in Cloud Firestore (`/stations/chatrai/settings/general`).
+   - **Blocking Force Update Dialog**: Displays a non-dismissible `AlertDialog` with `PopScope(canPop: false)` and `barrierDismissible: false` whenever an older app version is detected, displaying Telugu & English prompts and opening the APK download URL via `url_launcher`.
+   - **Owner APK Distribution Console**: Dedicated Tab 4 (*App Version & APK Releases*) in `StationSettingsScreen` allowing owners to set target version, build number, APK download link, force update switch, release notes, and preview the update dialog.
+
+9. **OCR Receipt Auto-Fill, Admin Security PIN Gate & Meter Save Validation**:
+   - **On-Device Receipt OCR Pipeline**: Automatically extracts `CumVolume`, `Date`, and `Time` from IndianOil receipt slips (`FP. ID 1 & 2`, `Nozzle No1 & No2`) using Google ML Kit and regex tokenization, auto-filling forecourt fields.
+   - **Instant Pump Switching**: Changing the dispenser dropdown instantly refreshes that pump's active nozzles, previous baseline readings, and resets the capture state.
+   - **Action-Oriented Capture State**: Button displays "Capture Photo" with live camera/gallery picking, transitioning to "Extracting with OCR..." with progress indication.
+   - **Branded Receipt Simulation**: Slip simulation card displays official branding: `Reya filling station receipt capture`.
+   - **Strict Meter Save Validation Gates**:
+     - Submissions without a newly captured receipt image are rejected (`Please capture a receipt photo before saving meter readings`).
+     - Submissions with unchanged meter readings (`Closing == Opening`) or negative volume deltas are rejected.
+   - **Clean Zero-Trust Login**: Eliminated test credential chips from the login screen; authentic entry required.
+   - **Mandatory Admin Security PIN (Max 6 Digits)**: Configurable in People Management (`UserFormScreen`) for each staff member and owner; strictly verified upon sign-in.
+   - **Post-Login Biometric Enrollment**: Fingerprint and Face authentication prompts now appear post-login rather than unauthenticated login screen.
+
+10. **PhonePe Mobile Subtitle, Strict Pump Slip Validation, Filtered Dynamic Ledger & Guardian Constraints**:
+   - **PhonePe Mobile Display**: 'Recorded in this shift' prominently displays the customer's 10-digit mobile number for PhonePe entries.
+   - **Pump Mismatch 'Wrong pump' Gate**: When an uploaded receipt slip's serial number or FP ID does not match the active dispenser (e.g. Pump 1 slip uploaded for Pump 2), scanning is strictly rejected with a 'Wrong pump' alert dialog and fields are cleared.
+   - **Direct Target Pump Navigation**: Clicking 'Scan Today' or any pump card on `MyShiftScreen` directly switches the Scan tab to the targeted pump.
+   - **Dynamic Money Ledger with Filters & Pagination**: Live integer calculations from `state.entries`; interactive Date filter, Staff member filter, Subtab categorizations (`Cash`, `PhonePe`, `Card`, `Credit`, `Paid out`), and 10-item pagination with `PaginationControl`.
+   - **Strict Character Constraints (Project Guardian Mandate)**: Standard text fields max 30 chars, phone numbers strictly 10 digits (`digitsOnly`), and meter readings max 15 chars enforced across all forms.
+
+
+11. **Credit Khata Auto-Registration, Dynamic Collections, Real Notifications & Receipt Approvals**:
+    - **Compulsory Credit Customer Selection & Auto-Registration**: When attendants select the Credit category in shift money entries, customer selection is compulsory. Attendants can select from registered credit customers or add a new customer with vehicle details. New customers are automatically enrolled in CreditCustomer with their initial outstanding balance and appear in the Owner Credit Khata portal.
+    - **Overhauled Forecourt Collections & Settlement**: Money ledger cash card updated to display total collections received (Cash + PhonePe/UPI + Card), detailed breakdown by payment mode, credit sales, expenses, cash given to owner, physical cash in hand, and net forecourt balance.
+    - **Removal of Legacy 'Category to Confirm'**: Discarded all legacy 'Category to confirm' badges and notes across Money Ledger and Daily Station Reports.
+    - **Real Dynamic Event Notifications**: Eliminated static dummy notifications; dynamically generates notifications for credit entries, money transactions, receipt scans, and shift change requests.
+    - **Accurate Last Recorded Timestamp**: My Shift screen displays the actual timestamp of the latest scanned receipt or displays Awaiting today\'s scan instead of misleading live clock updates.
+    - **Dynamically Computed Daily Reports**: All Daily Station Report metric cards (Recorded Sales, PhonePe + Card, Credit, Cash Given to Owner) and fuel calculations are dynamically derived from actual shift entries and pump readings.
+    - **Receipt Approval Workflow**: Owner-uploaded receipts are automatically marked Approved by Owner. Attendant-scanned receipts default to Pending review with explicit Approve receipt (updates pump nozzles) and Reject buttons.
+    - **Interactive Receipt Image Viewer**: Clicking Open original image launches a full-resolution interactive viewer with zoom and pan to inspect receipt slips.
 ---
 
 ## 📐 Golden Worked Fixture (Reconciliation Proof)
@@ -82,13 +127,15 @@ A rural-first petrol filling station management, meter reading capture, and fina
 - **Dart SDK**: `>= 3.11.5`
 - **Firebase CLI**: `>= 15.18.0`
 
-### 2. Run Automated Test Suite (16 Tests)
+### 2. Run Automated Test Suite (26 Tests)
 ```bash
 flutter test
 ```
 Validates:
 - `test/reconciliation_test.dart` (Exact integer paise/mL, fuel sales formulas, zero cash variance, boundary errors)
 - `test/ocr_parser_test.dart` (IndianOil hierarchical parsing, SHA-256 deduplication, date validation)
+- `test/ocr_and_security_pin_test.dart` (CumVolume/Date/Time extraction, Security PIN authentication gate, empty/invalid PIN rejection)
+- `test/app_version_test.dart` (Semantic version comparator, update policy, build number precedence)
 - `test/location_boundary_test.dart` (150m uncertainty geofence logic, GPS accuracy bounds)
 - `test/widget_test.dart` (Zero-Trust login gate, StaffShell forecourt controls, OwnerShell operations portal)
 

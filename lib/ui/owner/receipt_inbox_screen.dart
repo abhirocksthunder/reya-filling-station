@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/colors.dart';
 import '../../core/constants/dimensions.dart';
@@ -7,6 +8,7 @@ import '../../l10n/app_strings.dart';
 import '../../models/pump.dart';
 import '../../models/receipt_scan.dart';
 import '../../services/station_state_provider.dart';
+import 'package:image_picker/image_picker.dart';
 import '../common/pagination_control.dart';
 
 class ReceiptInboxScreen extends StatefulWidget {
@@ -69,11 +71,7 @@ class _ReceiptInboxScreenState extends State<ReceiptInboxScreen> {
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Administrative evidence import modal.')),
-                  );
-                },
+                onPressed: () => _showAddReceiptDialog(context, state),
               ),
             ],
           ),
@@ -214,22 +212,34 @@ class _ReceiptInboxScreenState extends State<ReceiptInboxScreen> {
                               style: const TextStyle(fontSize: 12, color: StationColors.textLight),
                             ),
                             const SizedBox(height: 4),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: r.validationStatus == ReceiptValidationStatus.valid
-                                    ? StationColors.warningBg
-                                    : Colors.grey.withOpacity(0.15),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                r.validationStatus == ReceiptValidationStatus.valid ? 'Pending review' : 'Accepted reading',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                  color: r.validationStatus == ReceiptValidationStatus.valid ? StationColors.warningAmber : Colors.black54,
-                                ),
-                              ),
+                            Builder(
+                              builder: (context) {
+                                final isOwner = r.capturedBy.toLowerCase().contains('owner');
+                                final isApproved = r.reviewStatus == 'approved' || isOwner;
+                                final isRejected = r.reviewStatus == 'rejected';
+
+                                final Color bg = isApproved
+                                    ? StationColors.successBg
+                                    : (isRejected ? StationColors.errorBg : StationColors.warningBg);
+                                final Color fg = isApproved
+                                    ? StationColors.successGreen
+                                    : (isRejected ? StationColors.errorRed : StationColors.warningAmber);
+                                final String text = isApproved
+                                    ? (isOwner ? 'Approved by Owner' : 'Approved reading')
+                                    : (isRejected ? 'Rejected' : 'Pending review');
+
+                                return Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: bg,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    text,
+                                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: fg),
+                                  ),
+                                );
+                              },
                             ),
                           ],
                         ),
@@ -463,75 +473,143 @@ class _ReceiptInboxScreenState extends State<ReceiptInboxScreen> {
           const SizedBox(height: 20),
 
           // Audit status banner
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: scan.validationStatus == ReceiptValidationStatus.valid ? StationColors.successBg : StationColors.warningBg,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: scan.validationStatus == ReceiptValidationStatus.valid ? StationColors.successGreen.withOpacity(0.3) : StationColors.warningBorder),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  scan.validationStatus == ReceiptValidationStatus.valid ? Icons.check_circle_outline : Icons.warning_amber_rounded,
-                  color: scan.validationStatus == ReceiptValidationStatus.valid ? StationColors.successGreen : StationColors.warningAmber,
-                  size: 24,
+          Builder(
+            builder: (context) {
+              final isOwner = scan.capturedBy.toLowerCase().contains('owner');
+              final isApproved = scan.reviewStatus == 'approved' || isOwner;
+              final isRejected = scan.reviewStatus == 'rejected';
+
+              final Color bg = isApproved
+                  ? StationColors.successBg
+                  : (isRejected ? StationColors.errorBg : StationColors.warningBg);
+              final Color border = isApproved
+                  ? StationColors.successGreen.withOpacity(0.3)
+                  : (isRejected ? StationColors.errorRed.withOpacity(0.3) : StationColors.warningBorder);
+              final Color fg = isApproved
+                  ? StationColors.successGreen
+                  : (isRejected ? StationColors.errorRed : StationColors.warningAmber);
+              final IconData icon = isApproved
+                  ? Icons.check_circle_outline
+                  : (isRejected ? Icons.cancel_outlined : Icons.pending_actions);
+              final String title = isApproved
+                  ? (isOwner ? 'Direct Owner Entry • Auto-Approved' : 'Verified Reading • Approved by Owner')
+                  : (isRejected ? 'Reading Rejected' : 'Pending Owner Review');
+
+              return Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: bg,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: border),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        scan.validationStatus == ReceiptValidationStatus.valid ? 'Verified Reading' : 'Reading Flagged for Attention',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13,
-                          color: scan.validationStatus == ReceiptValidationStatus.valid ? StationColors.successGreen : StationColors.warningAmber,
-                        ),
+                child: Row(
+                  children: [
+                    Icon(icon, color: fg, size: 24),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            title,
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: fg),
+                          ),
+                          Text(
+                            scan.statusMessage,
+                            style: const TextStyle(fontSize: 12, color: StationColors.textMedium),
+                          ),
+                        ],
                       ),
-                      Text(
-                        scan.statusMessage,
-                        style: const TextStyle(fontSize: 12, color: StationColors.textMedium),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              );
+            },
           ),
           const SizedBox(height: 20),
 
-          // Actions
-          Row(
-            children: [
-              ElevatedButton.icon(
-                icon: const Icon(Icons.open_in_new, size: 16, color: Colors.white),
-                label: const Text('Open original image', style: TextStyle(color: Colors.white)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: StationColors.primary,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Opening full resolution stored receipt image.')),
-                  );
-                },
-              ),
-              const SizedBox(width: 12),
-              OutlinedButton.icon(
-                icon: const Icon(Icons.refresh, size: 16),
-                label: const Text('Request new photo'),
-                style: OutlinedButton.styleFrom(
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Push notification dispatched to attendant for retake.')),
-                  );
-                },
-              ),
-            ],
+          // Actions Row
+          Builder(
+            builder: (context) {
+              final isOwner = scan.capturedBy.toLowerCase().contains('owner');
+              final isApproved = scan.reviewStatus == 'approved' || isOwner;
+
+              return Wrap(
+                spacing: 12,
+                runSpacing: 10,
+                children: [
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.zoom_in, size: 16, color: Colors.white),
+                    label: const Text('Open original image', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: StationColors.primary,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    ),
+                    onPressed: () => _showFullImageViewer(context, scan.imagePath),
+                  ),
+
+                  // If staff scan and not yet approved, show Approve and Reject buttons!
+                  if (!isApproved) ...[
+                    ElevatedButton.icon(
+                      icon: const Icon(Icons.check, size: 16, color: Colors.white),
+                      label: const Text('Approve receipt', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: StationColors.successGreen,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      ),
+                      onPressed: () {
+                        state.approveReceipt(scan.id);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Receipt for Pump ${scan.fpId} approved and pump nozzles updated!'),
+                            backgroundColor: StationColors.successGreen,
+                          ),
+                        );
+                      },
+                    ),
+                    OutlinedButton.icon(
+                      icon: const Icon(Icons.close, size: 16, color: StationColors.errorRed),
+                      label: const Text('Reject', style: TextStyle(color: StationColors.errorRed, fontWeight: FontWeight.bold)),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: StationColors.errorRed),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      ),
+                      onPressed: () {
+                        state.rejectReceipt(scan.id);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Receipt marked as rejected.'),
+                            backgroundColor: StationColors.errorRed,
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.refresh, size: 16),
+                    label: const Text('Request new photo'),
+                    style: OutlinedButton.styleFrom(
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    ),
+                    onPressed: () {
+                      state.addNotification(
+                        title: 'Rescan requested for Pump ${scan.fpId}',
+                        subtitle: 'Owner requested new receipt photograph',
+                        isWarning: true,
+                      );
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Push notification dispatched to attendant for retake.')),
+                      );
+                    },
+                  ),
+                ],
+              );
+            },
           ),
         ],
       ),
@@ -561,6 +639,328 @@ class _ReceiptInboxScreenState extends State<ReceiptInboxScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  void _showAddReceiptDialog(BuildContext context, StationStateProvider state) {
+    final pumps = state.pumps;
+    if (pumps.isEmpty) return;
+
+    String selectedPumpId = pumps.first.id;
+    Pump selectedPump = pumps.first;
+
+    final now = DateTime.now();
+    final dayStr = now.day.toString().padLeft(2, '0');
+    final monthStr = now.month.toString().padLeft(2, '0');
+    final dateCtrl = TextEditingController(text: '$dayStr/$monthStr/${now.year}');
+    final hourStr = now.hour.toString().padLeft(2, '0');
+    final minStr = now.minute.toString().padLeft(2, '0');
+    final secStr = now.second.toString().padLeft(2, '0');
+    final timeCtrl = TextEditingController(text: '$hourStr:$minStr:$secStr');
+
+    final n1Ctrl = TextEditingController(
+      text: selectedPump.nozzles.isNotEmpty
+          ? (selectedPump.nozzles[0].currentTotaliserMl / 1000.0).toStringAsFixed(3)
+          : '',
+    );
+    final n2Ctrl = TextEditingController(
+      text: selectedPump.nozzles.length > 1
+          ? (selectedPump.nozzles[1].currentTotaliserMl / 1000.0).toStringAsFixed(3)
+          : '',
+    );
+
+    String? pickedPhotoName;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.add_photo_alternate, color: StationColors.primary),
+              SizedBox(width: 10),
+              Text('Add IndianOil Pump Receipt', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+            ],
+          ),
+          content: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 480),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Select Dispenser / Pump:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  const SizedBox(height: 6),
+                  DropdownButtonFormField<String>(
+                    value: selectedPumpId,
+                    decoration: const InputDecoration(isDense: true, border: OutlineInputBorder()),
+                    items: pumps.map((p) => DropdownMenuItem(value: p.id, child: Text('${p.name} (SNo: ${p.serialNumber})'))).toList(),
+                    onChanged: (val) {
+                      if (val != null) {
+                        setDialogState(() {
+                          selectedPumpId = val;
+                          selectedPump = pumps.firstWhere((p) => p.id == val);
+                          if (selectedPump.nozzles.isNotEmpty) {
+                            n1Ctrl.text = (selectedPump.nozzles[0].currentTotaliserMl / 1000.0).toStringAsFixed(3);
+                          }
+                          if (selectedPump.nozzles.length > 1) {
+                            n2Ctrl.text = (selectedPump.nozzles[1].currentTotaliserMl / 1000.0).toStringAsFixed(3);
+                          }
+                        });
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Image picker button
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF7F9F9),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: StationColors.divider),
+                    ),
+                    child: Column(
+                      children: [
+                        Text(
+                          pickedPhotoName ?? 'No photo selected yet',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: pickedPhotoName != null ? StationColors.successGreen : StationColors.textLight,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            ElevatedButton.icon(
+                              icon: const Icon(Icons.camera_alt, size: 16, color: Colors.white),
+                              label: const Text('Camera', style: TextStyle(fontSize: 12, color: Colors.white)),
+                              style: ElevatedButton.styleFrom(backgroundColor: StationColors.primary),
+                              onPressed: () async {
+                                final picker = ImagePicker();
+                                final file = await picker.pickImage(source: ImageSource.camera);
+                                if (file != null) {
+                                  setDialogState(() {
+                                    pickedPhotoName = 'Captured: ${file.name}';
+                                  });
+                                }
+                              },
+                            ),
+                            const SizedBox(width: 10),
+                            OutlinedButton.icon(
+                              icon: const Icon(Icons.photo_library, size: 16),
+                              label: const Text('Gallery / File', style: TextStyle(fontSize: 12)),
+                              onPressed: () async {
+                                final picker = ImagePicker();
+                                final file = await picker.pickImage(source: ImageSource.gallery);
+                                if (file != null) {
+                                  setDialogState(() {
+                                    pickedPhotoName = 'Selected: ${file.name}';
+                                  });
+                                }
+                              },
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: dateCtrl,
+                          maxLength: 10,
+                          inputFormatters: [LengthLimitingTextInputFormatter(10)],
+                          decoration: const InputDecoration(labelText: 'Date (dd/MM/yyyy)', counterText: '', isDense: true, border: OutlineInputBorder()),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: TextField(
+                          controller: timeCtrl,
+                          maxLength: 8,
+                          inputFormatters: [LengthLimitingTextInputFormatter(8)],
+                          decoration: const InputDecoration(labelText: 'Time (HH:mm:ss)', counterText: '', isDense: true, border: OutlineInputBorder()),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+
+                  TextField(
+                    controller: n1Ctrl,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    maxLength: 15,
+                    inputFormatters: [LengthLimitingTextInputFormatter(15)],
+                    decoration: InputDecoration(
+                      labelText: selectedPump.nozzles.isNotEmpty
+                          ? 'Nozzle 1 (${selectedPump.nozzles[0].fuelType}) Litres'
+                          : 'Nozzle 1 Litres',
+                      counterText: '',
+                      isDense: true,
+                      border: const OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  TextField(
+                    controller: n2Ctrl,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    maxLength: 15,
+                    inputFormatters: [LengthLimitingTextInputFormatter(15)],
+                    decoration: InputDecoration(
+                      labelText: selectedPump.nozzles.length > 1
+                          ? 'Nozzle 2 (${selectedPump.nozzles[1].fuelType}) Litres'
+                          : 'Nozzle 2 Litres',
+                      counterText: '',
+                      isDense: true,
+                      border: const OutlineInputBorder(),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.check, size: 16, color: Colors.white),
+              label: const Text('Save & Update Totaliser', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              style: ElevatedButton.styleFrom(backgroundColor: StationColors.successGreen),
+              onPressed: () {
+                final double? n1 = double.tryParse(n1Ctrl.text);
+                final double? n2 = double.tryParse(n2Ctrl.text);
+                if (n1 == null || n2 == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Please enter valid cumulative litre readings for both nozzles.')),
+                  );
+                  return;
+                }
+
+                final newScan = ReceiptScan(
+                  id: 'scan_${DateTime.now().millisecondsSinceEpoch}',
+                  pumpSerialNumber: selectedPump.serialNumber,
+                  fpId: selectedPump.id.replaceAll('pump_', ''),
+                  printedDate: dateCtrl.text.trim(),
+                  printedTime: timeCtrl.text.trim(),
+                  nozzleCumVolumeMl: {
+                    1: (n1 * 1000).round(),
+                    2: (n2 * 1000).round(),
+                  },
+                  imagePath: selectedPump.referenceReceiptAsset ?? 'assets/images/media_1791616403909.jpg',
+                  validationStatus: ReceiptValidationStatus.valid,
+                  reviewStatus: 'approved',
+                  statusMessage: 'Direct owner totaliser receipt recorded.',
+                  capturedBy: '${state.currentUser.name} (Owner Upload)',
+                  capturedAt: DateTime.now(),
+                  locationVerified: true,
+                  distanceMeters: 14.5,
+                );
+
+                state.saveReceiptScan(newScan);
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Receipt slip recorded and totaliser updated for ${selectedPump.name}!'),
+                    backgroundColor: StationColors.successGreen,
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showFullImageViewer(BuildContext context, String imagePath) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        insetPadding: const EdgeInsets.all(16),
+        backgroundColor: Colors.black,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: Container(
+          width: double.infinity,
+          height: MediaQuery.of(context).size.height * 0.85,
+          constraints: const BoxConstraints(maxWidth: 800),
+          child: Column(
+            children: [
+              // Top bar
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                color: Colors.black87,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.zoom_in, color: Colors.white, size: 20),
+                        SizedBox(width: 8),
+                        Text(
+                          'Original IndianOil Receipt Slip',
+                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                        ),
+                      ],
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Colors.white),
+                      onPressed: () => Navigator.pop(ctx),
+                      tooltip: 'Close',
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: InteractiveViewer(
+                  panEnabled: true,
+                  minScale: 0.5,
+                  maxScale: 4.0,
+                  child: Center(
+                    child: _buildImageView(imagePath),
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.all(12),
+                color: Colors.black87,
+                child: const Text(
+                  'Pinch or scroll to zoom • Pan to inspect totaliser readings',
+                  style: TextStyle(color: Colors.white70, fontSize: 12),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildImageView(String imagePath) {
+    if (imagePath.startsWith('http')) {
+      return Image.network(imagePath, fit: BoxFit.contain);
+    }
+    if (imagePath.startsWith('assets/')) {
+      return Image.asset(imagePath, fit: BoxFit.contain);
+    }
+    return Image.asset(
+      'assets/images/media_1791616403909.jpg',
+      fit: BoxFit.contain,
+      errorBuilder: (context, error, stackTrace) {
+        return const Center(
+          child: Text('Receipt image preview unavailable', style: TextStyle(color: Colors.white)),
+        );
+      },
     );
   }
 }

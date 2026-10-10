@@ -88,6 +88,11 @@ class AppStrings {
       'whoUpdatedThis': 'Who updated this',
       'exportReport': 'Export report',
       'print': 'Print',
+      'addPump': 'Add pump',
+      'editPump': 'Edit pump',
+      'deletePump': 'Delete pump',
+      'pumpName': 'Pump name',
+      'serialNumber': 'Serial number',
     },
     'te': {
       'appName': 'రేయా ఫిల్లింగ్ స్టేషన్',
@@ -177,6 +182,11 @@ class AppStrings {
       'whoUpdatedThis': 'ఎవరు నమోదు చేశారు',
       'exportReport': 'ఎగుమతి చేయండి',
       'print': 'ప్రింట్ చేయండి',
+      'addPump': 'కొత్త పంప్ చేర్చండి',
+      'editPump': 'పంప్ సవరించండి',
+      'deletePump': 'పంప్ తొలగించండి',
+      'pumpName': 'పంప్ పేరు',
+      'serialNumber': 'సీరియల్ నంబర్',
     },
   };
 

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/colors.dart';
 import '../../core/constants/dimensions.dart';
@@ -89,8 +90,26 @@ class _CreditKhataScreenState extends State<CreditKhataScreen> {
                     ),
                     child: displayedCustomers.isEmpty
                         ? const Padding(
-                            padding: EdgeInsets.all(24),
-                            child: Center(child: Text('No credit customers registered.')),
+                            padding: EdgeInsets.all(32),
+                            child: Center(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.bookmark_outline, size: 40, color: Colors.grey),
+                                  SizedBox(height: 12),
+                                  Text(
+                                    'No credit customers registered yet',
+                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: StationColors.textDark),
+                                  ),
+                                  SizedBox(height: 4),
+                                  Text(
+                                    'When attendants record credit sales in shift entries, customers will appear here automatically.',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(fontSize: 12, color: StationColors.textMedium),
+                                  ),
+                                ],
+                              ),
+                            ),
                           )
                         : ListView.separated(
                             shrinkWrap: true,
@@ -228,9 +247,15 @@ class _CreditKhataScreenState extends State<CreditKhataScreen> {
                                 child: TextField(
                                   controller: _paymentAmountController,
                                   keyboardType: TextInputType.number,
+                                  maxLength: 10,
+                                  inputFormatters: [
+                                    FilteringTextInputFormatter.digitsOnly,
+                                    LengthLimitingTextInputFormatter(10),
+                                  ],
                                   decoration: InputDecoration(
                                     labelText: 'Payment amount',
                                     prefixText: '₹ ',
+                                    counterText: '',
                                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                                     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                                   ),

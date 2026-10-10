@@ -6,3 +6,8 @@ This repository follows AIPCC Project Guardian standards:
 - Update `README.md` whenever implementation, setup instructions, APIs, or project capabilities change.
 - Run `python D:/AI operating system/scripts/sync_project_guardian_docs.py --project reya-filling-station` before pushing.
 - Pre-push hook blocks pushes if documentation, README, or change logs are missing.
+- Strict Field Character Constraints Mandate:
+  - Standard text fields: max 30 characters.
+  - Phone numbers: strictly 10 digits (`digitsOnly`, max 10).
+  - Meter readings / totalisers: max 15 characters.
+  - Security PIN: 4-6 digits.

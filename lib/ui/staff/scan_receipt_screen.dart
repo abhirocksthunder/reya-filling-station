@@ -1,4 +1,7 @@
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/colors.dart';
 import '../../core/constants/dimensions.dart';
@@ -7,6 +10,8 @@ import '../../l10n/app_strings.dart';
 import '../../models/pump.dart';
 import '../../models/receipt_scan.dart';
 import '../../services/station_state_provider.dart';
+import '../../services/ocr_service.dart';
+import 'package:image_picker/image_picker.dart';
 
 class ScanReceiptScreen extends StatefulWidget {
   final Function(int)? onNavigate;
@@ -19,8 +24,15 @@ class ScanReceiptScreen extends StatefulWidget {
 
 class _ScanReceiptScreenState extends State<ScanReceiptScreen> {
   String? _selectedPumpId;
-  String? _uploadedImagePath = 'assets/images/media_1791616403909.jpg';
+  String? _uploadedImagePath;
   bool _isCustomImageUploaded = false;
+  bool _isProcessingOcr = false;
+  bool _isValidatedByOcr = false;
+  bool _isStrictVerified = false;
+  double _ocrConfidence = 1.0;
+  String? _ocrErrorMessage;
+  Map<int, String> _matchedSnippets = {};
+  String _ocrRawText = '';
 
   late final TextEditingController _dateController;
   late final TextEditingController _timeController;
@@ -46,19 +58,28 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     final state = context.read<StationStateProvider>();
-    if (_selectedPumpId == null && state.pumps.isNotEmpty) {
+    if (state.activeScanPumpId != null && state.activeScanPumpId != _selectedPumpId) {
+      final targetPump = state.pumps.firstWhere(
+        (p) => p.id == state.activeScanPumpId,
+        orElse: () => state.pumps.first,
+      );
+      _selectPump(targetPump);
+    } else if (_selectedPumpId == null && state.pumps.isNotEmpty) {
       _selectPump(state.pumps.first);
     }
   }
 
   void _selectPump(Pump pump) {
     _selectedPumpId = pump.id;
-    if (pump.nozzles.isNotEmpty) {
-      _nozzle1Controller.text = (pump.nozzles[0].currentTotaliserMl / 1000.0).toStringAsFixed(3);
-    }
-    if (pump.nozzles.length > 1) {
-      _nozzle2Controller.text = (pump.nozzles[1].currentTotaliserMl / 1000.0).toStringAsFixed(3);
-    }
+    _isCustomImageUploaded = false;
+    _uploadedImagePath = null;
+    _isValidatedByOcr = false;
+    _isStrictVerified = false;
+    _matchedSnippets = {};
+    _ocrRawText = '';
+    _ocrErrorMessage = null;
+    _nozzle1Controller.clear();
+    _nozzle2Controller.clear();
   }
 
   @override
@@ -83,10 +104,15 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen> {
           : const Pump(id: 'pump_1', name: 'Pump 1', serialNumber: '202501001272', nozzles: []),
     );
 
-    double n1Litres = double.tryParse(_nozzle1Controller.text) ??
-        (selectedPump.nozzles.isNotEmpty ? selectedPump.nozzles[0].currentTotaliserMl / 1000.0 : 0.0);
-    double n2Litres = double.tryParse(_nozzle2Controller.text) ??
-        (selectedPump.nozzles.length > 1 ? selectedPump.nozzles[1].currentTotaliserMl / 1000.0 : 0.0);
+    final double prevN1 = selectedPump.nozzles.isNotEmpty
+        ? (selectedPump.nozzles[0].currentTotaliserMl / 1000.0)
+        : 0.0;
+    final double prevN2 = selectedPump.nozzles.length > 1
+        ? (selectedPump.nozzles[1].currentTotaliserMl / 1000.0)
+        : 0.0;
+
+    double n1Litres = double.tryParse(_nozzle1Controller.text) ?? prevN1;
+    double n2Litres = double.tryParse(_nozzle2Controller.text) ?? prevN2;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
@@ -166,7 +192,11 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen> {
                   onChanged: (val) {
                     if (val != null) {
                       final p = pumps.firstWhere((item) => item.id == val);
-                      setState(() => _selectPump(p));
+                      setState(() {
+                        _selectPump(p);
+                        _isCustomImageUploaded = false;
+                        _uploadedImagePath = null;
+                      });
                     }
                   },
                 ),
@@ -177,42 +207,59 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen> {
                   children: [
                     Expanded(
                       child: OutlinedButton.icon(
-                        icon: Icon(
-                          _isCustomImageUploaded ? Icons.check_circle : Icons.camera_alt_outlined,
-                          color: _isCustomImageUploaded ? StationColors.successGreen : StationColors.primary,
-                        ),
+                        icon: _isProcessingOcr
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: StationColors.primary),
+                              )
+                            : const Icon(
+                                Icons.camera_alt_outlined,
+                                color: StationColors.primary,
+                              ),
                         label: Text(
-                          _isCustomImageUploaded ? 'Receipt Photo Captured' : 'Take / Upload Receipt Photo',
-                          style: TextStyle(
-                            color: _isCustomImageUploaded ? StationColors.successGreen : StationColors.primary,
+                          _isProcessingOcr ? 'Extracting with OCR...' : 'Capture Photo',
+                          style: const TextStyle(
+                            color: StationColors.primary,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                         style: OutlinedButton.styleFrom(
-                          side: BorderSide(
-                            color: _isCustomImageUploaded ? StationColors.successGreen : StationColors.primary,
-                          ),
+                          side: const BorderSide(color: StationColors.primary, width: 1.5),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                           padding: const EdgeInsets.symmetric(vertical: 12),
                         ),
-                        onPressed: !state.settings.allowStaffTotaliserCameraScan
+                        onPressed: (!state.settings.allowStaffTotaliserCameraScan || _isProcessingOcr)
                             ? null
-                            : () {
-                                setState(() {
-                                  _isCustomImageUploaded = true;
-                                  _uploadedImagePath = 'assets/images/media_1791616403909.jpg';
-                                });
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Receipt slip photo captured & verified.'),
-                                    backgroundColor: StationColors.successGreen,
-                                  ),
-                                );
-                              },
+                            : () => _captureOrUploadReceiptPhoto(context),
                       ),
                     ),
                   ],
                 ),
+                if (_isCustomImageUploaded && _uploadedImagePath != null) ...[
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: StationColors.successBg,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: StationColors.successGreen.withOpacity(0.3)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.check_circle, color: StationColors.successGreen, size: 16),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Photo attached: ${_uploadedImagePath!.split(RegExp(r"[\\/]")).last}',
+                            style: const TextStyle(fontSize: 12, color: StationColors.successGreen, fontWeight: FontWeight.bold),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -239,8 +286,11 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen> {
                     Expanded(
                       child: TextField(
                         controller: _dateController,
+                        maxLength: 10,
+                        inputFormatters: [LengthLimitingTextInputFormatter(10)],
                         decoration: const InputDecoration(
                           labelText: 'Date (dd/MM/yyyy)',
+                          counterText: '',
                           isDense: true,
                           border: OutlineInputBorder(),
                         ),
@@ -251,8 +301,11 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen> {
                     Expanded(
                       child: TextField(
                         controller: _timeController,
+                        maxLength: 8,
+                        inputFormatters: [LengthLimitingTextInputFormatter(8)],
                         decoration: const InputDecoration(
                           labelText: 'Time (HH:mm:ss)',
+                          counterText: '',
                           isDense: true,
                           border: OutlineInputBorder(),
                         ),
@@ -267,6 +320,8 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen> {
                     Expanded(
                       child: TextField(
                         controller: _nozzle1Controller,
+                        maxLength: 15,
+                        inputFormatters: [LengthLimitingTextInputFormatter(15)],
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
                         decoration: InputDecoration(
                           labelText: selectedPump.nozzles.isNotEmpty
@@ -275,6 +330,7 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen> {
                           helperText: selectedPump.nozzles.isNotEmpty
                               ? 'Prev: ${selectedPump.nozzles[0].formattedPreviousReading}'
                               : null,
+                          counterText: '',
                           isDense: true,
                           border: const OutlineInputBorder(),
                         ),
@@ -285,6 +341,8 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen> {
                     Expanded(
                       child: TextField(
                         controller: _nozzle2Controller,
+                        maxLength: 15,
+                        inputFormatters: [LengthLimitingTextInputFormatter(15)],
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
                         decoration: InputDecoration(
                           labelText: selectedPump.nozzles.length > 1
@@ -293,6 +351,7 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen> {
                           helperText: selectedPump.nozzles.length > 1
                               ? 'Prev: ${selectedPump.nozzles[1].formattedPreviousReading}'
                               : null,
+                          counterText: '',
                           isDense: true,
                           border: const OutlineInputBorder(),
                         ),
@@ -306,99 +365,185 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen> {
           ),
           const SizedBox(height: 16),
 
-          // Printed Receipt View Card (Live reflection of input)
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFBF8F1),
-              borderRadius: BorderRadius.circular(StationDimensions.cardRadius),
-              border: Border.all(color: const Color(0xFFE2D9C8)),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: Colors.black12,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: const Text('INDIANOIL AUTOMATION', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
-                    ),
-                    const Icon(Icons.receipt_long, size: 20, color: Colors.black54),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                _buildReceiptLine('FP. ID', ': ${selectedPump.id.replaceAll('pump_', '')}'),
-                _buildReceiptLine('Pump SNo', ': ${selectedPump.serialNumber}'),
-                _buildReceiptLine('Date', ': ${_dateController.text}'),
-                _buildReceiptLine('Time', ': ${_timeController.text}'),
-                const Divider(height: 16, color: Color(0xFFD6CBBB)),
-                Text(
-                  'Nozzle No1 (${selectedPump.nozzles.isNotEmpty ? selectedPump.nozzles[0].fuelType : 'Petrol'})',
-                  style: const TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 13),
-                ),
-                Text(
-                  'CumVolume: ${n1Litres.toStringAsFixed(3)}',
-                  style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Nozzle No2 (${selectedPump.nozzles.length > 1 ? selectedPump.nozzles[1].fuelType : 'Diesel'})',
-                  style: const TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 13),
-                ),
-                Text(
-                  'CumVolume: ${n2Litres.toStringAsFixed(3)}',
-                  style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          // "Read from receipt" Summary Box
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(StationDimensions.cardRadius),
-              border: Border.all(color: StationColors.divider),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  AppStrings.get('readFromReceipt', lang),
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: StationColors.textDark,
+          // Single Authoritative Captured Receipt Block (Only shown when photo captured or entered)
+          if (_isCustomImageUploaded || _isValidatedByOcr) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFBF8F1),
+                borderRadius: BorderRadius.circular(StationDimensions.cardRadius),
+                border: Border.all(color: const Color(0xFFE2D9C8)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.04),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
                   ),
-                ),
-                const SizedBox(height: 12),
-                _buildSummaryRow(AppStrings.get('pump', lang), selectedPump.name),
-                const SizedBox(height: 8),
-                _buildSummaryRow(AppStrings.get('receiptDate', lang), _dateController.text),
-                const SizedBox(height: 8),
-                _buildSummaryRow('Nozzle 1 (${selectedPump.nozzles.isNotEmpty ? selectedPump.nozzles[0].fuelType : ''})', '${n1Litres.toStringAsFixed(3)} L', isBoldValue: true),
-                const SizedBox(height: 8),
-                _buildSummaryRow('Nozzle 2 (${selectedPump.nozzles.length > 1 ? selectedPump.nozzles[1].fuelType : ''})', '${n2Litres.toStringAsFixed(3)} L', isBoldValue: true),
-              ],
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: StationColors.primary.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: StationColors.primary.withOpacity(0.2)),
+                        ),
+                        child: const Text(
+                          'Reya filling station receipt capture',
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: StationColors.primary),
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: _isValidatedByOcr ? StationColors.successBg : StationColors.warningBg,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          _isValidatedByOcr
+                              ? (_isStrictVerified ? '✓ Strict Slip Match (100%)' : '✓ OCR Validated')
+                              : '⚠️ Verification Required',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: _isValidatedByOcr ? StationColors.successGreen : StationColors.warningAmber,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  _buildReceiptLine('Dispenser', ': ${selectedPump.name} (SNo: ${selectedPump.serialNumber})'),
+                  _buildReceiptLine('FP. ID', ': ${selectedPump.id.replaceAll('pump_', '')}'),
+                  _buildReceiptLine('Date', ': ${_dateController.text}'),
+                  _buildReceiptLine('Time', ': ${_timeController.text}'),
+                  const Divider(height: 18, color: Color(0xFFD6CBBB)),
+                  _buildSummaryRow(
+                    'Nozzle 1 (${selectedPump.nozzles.isNotEmpty ? selectedPump.nozzles[0].fuelType : 'Petrol'})',
+                    '${n1Litres.toStringAsFixed(3)} L',
+                    isBoldValue: true,
+                  ),
+                  if (selectedPump.nozzles.isNotEmpty) ...[
+                    Padding(
+                      padding: const EdgeInsets.only(left: 4, bottom: 4),
+                      child: Text(
+                        'Baseline: ${selectedPump.nozzles[0].formattedPreviousReading} • Delta: ${n1Litres >= prevN1 ? "+${(n1Litres - prevN1).toStringAsFixed(3)} L" : "${(n1Litres - prevN1).toStringAsFixed(3)} L (LOWER THAN BASELINE)"}',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: n1Litres < prevN1 ? FontWeight.bold : FontWeight.normal,
+                          color: n1Litres < prevN1 ? StationColors.errorRed : StationColors.textLight,
+                        ),
+                      ),
+                    ),
+                  ],
+                  if (_matchedSnippets.containsKey(1)) ...[
+                    Padding(
+                      padding: const EdgeInsets.only(left: 4, bottom: 8),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: Colors.grey.shade300),
+                        ),
+                        child: Text(
+                          'Matched on Slip: "${_matchedSnippets[1]}"',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontFamily: 'monospace',
+                            color: StationColors.textDark,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 8),
+                  _buildSummaryRow(
+                    'Nozzle 2 (${selectedPump.nozzles.length > 1 ? selectedPump.nozzles[1].fuelType : 'Diesel'})',
+                    '${n2Litres.toStringAsFixed(3)} L',
+                    isBoldValue: true,
+                  ),
+                  if (selectedPump.nozzles.length > 1) ...[
+                    Padding(
+                      padding: const EdgeInsets.only(left: 4, bottom: 4),
+                      child: Text(
+                        'Baseline: ${selectedPump.nozzles[1].formattedPreviousReading} • Delta: ${n2Litres >= prevN2 ? "+${(n2Litres - prevN2).toStringAsFixed(3)} L" : "${(n2Litres - prevN2).toStringAsFixed(3)} L (LOWER THAN BASELINE)"}',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: n2Litres < prevN2 ? FontWeight.bold : FontWeight.normal,
+                          color: n2Litres < prevN2 ? StationColors.errorRed : StationColors.textLight,
+                        ),
+                      ),
+                    ),
+                  ],
+                  if (_matchedSnippets.containsKey(2)) ...[
+                    Padding(
+                      padding: const EdgeInsets.only(left: 4, bottom: 8),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: Colors.grey.shade300),
+                        ),
+                        child: Text(
+                          'Matched on Slip: "${_matchedSnippets[2]}"',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontFamily: 'monospace',
+                            color: StationColors.textDark,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                  if (_ocrRawText.isNotEmpty) ...[
+                    const Divider(height: 18, color: Color(0xFFD6CBBB)),
+                    Theme(
+                      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                      child: ExpansionTile(
+                        tilePadding: EdgeInsets.zero,
+                        title: const Text(
+                          'View Full Receipt OCR Text (Audit)',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: StationColors.primary),
+                        ),
+                        children: [
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: Colors.grey.shade300),
+                            ),
+                            child: SelectableText(
+                              _ocrRawText,
+                              style: const TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 11,
+                                color: StationColors.textDark,
+                                height: 1.3,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: 16),
+            const SizedBox(height: 16),
+          ],
 
           // Valid counter badge
           Container(
@@ -414,7 +559,7 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen> {
                 SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Dynamic counter validation active • Updates pump & Cloud Firestore',
+                    'Dynamic counter validation active • Updates pump & central records',
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.bold,
@@ -428,109 +573,386 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen> {
           const SizedBox(height: 24),
 
           // Action Buttons
-          Row(
-            children: [
-              Expanded(
-                child: SizedBox(
-                  height: StationDimensions.primaryButtonHeight,
-                  child: OutlinedButton.icon(
-                    icon: const Icon(Icons.refresh, color: StationColors.primary),
-                    label: const Text(
-                      'Reset Readings',
-                      style: TextStyle(
-                        color: StationColors.primary,
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: StationColors.primary, width: 1.5),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(StationDimensions.buttonRadius),
-                      ),
-                    ),
-                    onPressed: () {
-                      _selectPump(selectedPump);
-                      setState(() {
-                        _isCustomImageUploaded = false;
-                      });
-                    },
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: SizedBox(
-                  height: StationDimensions.primaryButtonHeight,
-                  child: ElevatedButton.icon(
-                    icon: const Icon(Icons.check, color: Colors.white),
-                    label: Text(
-                      AppStrings.get('saveReading', lang),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: StationColors.successGreen,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(StationDimensions.buttonRadius),
-                      ),
-                    ),
-                    onPressed: !state.settings.allowStaffTotaliserCameraScan
-                        ? () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Totaliser camera scan is restricted by Station Owner in settings.'),
-                                backgroundColor: StationColors.errorRed,
+          Builder(
+            builder: (context) {
+              final bool canSave = state.settings.allowStaffTotaliserCameraScan &&
+                  _isCustomImageUploaded &&
+                  _uploadedImagePath != null &&
+                  !_isProcessingOcr &&
+                  _isValidatedByOcr;
+
+              return Column(
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: SizedBox(
+                          height: StationDimensions.primaryButtonHeight,
+                          child: OutlinedButton.icon(
+                            icon: const Icon(Icons.refresh, color: StationColors.primary),
+                            label: const Text(
+                              'Reset Readings',
+                              style: TextStyle(
+                                color: StationColors.primary,
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
                               ),
-                            );
-                          }
-                        : () {
-                            final n1Ml = (n1Litres * 1000).round();
-                            final n2Ml = (n2Litres * 1000).round();
-
-                            final scan = ReceiptScan(
-                              id: 'scan_${DateTime.now().millisecondsSinceEpoch}',
-                              pumpSerialNumber: selectedPump.serialNumber,
-                              fpId: selectedPump.id.replaceAll('pump_', ''),
-                              printedDate: _dateController.text,
-                              printedTime: _timeController.text,
-                              nozzleCumVolumeMl: {
-                                1: n1Ml,
-                                2: n2Ml,
-                              },
-                              imagePath: _uploadedImagePath ?? 'assets/images/media_1791616403909.jpg',
-                              validationStatus: ReceiptValidationStatus.valid,
-                              statusMessage: 'Verified dynamic reading committed.',
-                              capturedBy: '${state.currentUser.name} (live capture)',
-                              capturedAt: DateTime.now(),
-                            );
-
-                            state.saveReceiptScan(scan);
-
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Totaliser reading saved! ${selectedPump.name} nozzles updated in Firestore.'),
-                                backgroundColor: StationColors.successGreen,
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(color: StationColors.primary, width: 1.5),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(StationDimensions.buttonRadius),
                               ),
-                            );
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                _dateController.clear();
+                                _timeController.clear();
+                                _nozzle1Controller.clear();
+                                _nozzle2Controller.clear();
+                                _isCustomImageUploaded = false;
+                                _uploadedImagePath = null;
+                                _isValidatedByOcr = false;
+                                _isStrictVerified = false;
+                                _matchedSnippets = {};
+                                _ocrRawText = '';
+                                _ocrErrorMessage = null;
+                              });
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Readings cleared and receipt capture reset.')),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: SizedBox(
+                          height: StationDimensions.primaryButtonHeight,
+                          child: ElevatedButton.icon(
+                            icon: const Icon(Icons.check, color: Colors.white),
+                            label: Text(
+                              AppStrings.get('saveReading', lang),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: canSave ? StationColors.successGreen : Colors.grey.shade400,
+                              elevation: canSave ? 1 : 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(StationDimensions.buttonRadius),
+                              ),
+                            ),
+                            onPressed: canSave
+                                ? () {
+                                    // Validation gate 2: Meter readings must have changed from previous/baseline readings
+                                    final double prevN1 = selectedPump.nozzles.isNotEmpty
+                                        ? (selectedPump.nozzles[0].currentTotaliserMl / 1000.0)
+                                        : 0.0;
+                                    final double prevN2 = selectedPump.nozzles.length > 1
+                                        ? (selectedPump.nozzles[1].currentTotaliserMl / 1000.0)
+                                        : 0.0;
 
-                            if (widget.onNavigate != null) {
-                              widget.onNavigate!(0); // Back to My Shift
-                            }
-                          },
+                                    final bool n1Changed = (n1Litres - prevN1).abs() > 0.0001;
+                                    final bool n2Changed = (n2Litres - prevN2).abs() > 0.0001;
+
+                                    if (!n1Changed && !n2Changed) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('No changes detected in readings. Enter new readings from the captured receipt.'),
+                                          backgroundColor: StationColors.errorRed,
+                                        ),
+                                      );
+                                      return;
+                                    }
+
+                                    if (n1Litres < prevN1 || n2Litres < prevN2) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('New readings cannot be lower than the previous baseline reading.'),
+                                          backgroundColor: StationColors.errorRed,
+                                        ),
+                                      );
+                                      return;
+                                    }
+
+                                    final n1Ml = (n1Litres * 1000).round();
+                                    final n2Ml = (n2Litres * 1000).round();
+
+                                    final scan = ReceiptScan(
+                                      id: 'scan_${DateTime.now().millisecondsSinceEpoch}',
+                                      pumpSerialNumber: selectedPump.serialNumber,
+                                      fpId: selectedPump.id.replaceAll('pump_', ''),
+                                      printedDate: _dateController.text,
+                                      printedTime: _timeController.text,
+                                      nozzleCumVolumeMl: {
+                                        1: n1Ml,
+                                        2: n2Ml,
+                                      },
+                                      imagePath: _uploadedImagePath!,
+                                      validationStatus: ReceiptValidationStatus.valid,
+                                      statusMessage: 'Verified dynamic reading committed via OCR capture.',
+                                      capturedBy: '${state.currentUser.name} (live capture)',
+                                      capturedAt: DateTime.now(),
+                                    );
+
+                                    state.saveReceiptScan(scan);
+
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('Totaliser reading saved! ${selectedPump.name} nozzles updated successfully.'),
+                                        backgroundColor: StationColors.successGreen,
+                                      ),
+                                    );
+
+                                    if (widget.onNavigate != null) {
+                                      widget.onNavigate!(0); // Back to My Shift
+                                    }
+                                  }
+                                : null,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              ),
-            ],
+                  if (!canSave) ...[
+                    const SizedBox(height: 8),
+                    Center(
+                      child: Text(
+                        !state.settings.allowStaffTotaliserCameraScan
+                            ? 'Scanning restricted by owner in settings'
+                            : (!_isCustomImageUploaded || !_isValidatedByOcr)
+                                ? '🔒 Capture photo and validate using OCR to enable save'
+                                : 'Processing OCR verification...',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade600,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              );
+            },
           ),
           const SizedBox(height: 20),
         ],
       ),
     );
+  }
+
+  Future<void> _captureOrUploadReceiptPhoto(BuildContext context) async {
+    final picker = ImagePicker();
+    final XFile? photo = await showModalBottomSheet<XFile?>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt, color: StationColors.primary),
+              title: const Text('Open Camera (Take Photo)'),
+              onTap: () async {
+                final f = await picker.pickImage(source: ImageSource.camera);
+                Navigator.pop(ctx, f);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library, color: StationColors.primary),
+              title: const Text('Select from Gallery / Storage'),
+              onTap: () async {
+                final f = await picker.pickImage(source: ImageSource.gallery);
+                Navigator.pop(ctx, f);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (photo != null) {
+      setState(() {
+        _isProcessingOcr = true;
+      });
+
+      try {
+        String effectivePath = photo.path;
+        if (kIsWeb) {
+          try {
+            final bytes = await photo.readAsBytes();
+            if (bytes.isNotEmpty) {
+              final base64Data = base64Encode(bytes);
+              final mime = photo.mimeType ?? 'image/png';
+              effectivePath = 'data:$mime;base64,$base64Data';
+            }
+          } catch (e) {
+            debugPrint('Could not read image bytes on web: $e');
+          }
+        }
+
+        final extraction = await OcrService.processReceiptImage(
+          effectivePath,
+          targetPumpId: _selectedPumpId,
+        );
+
+        if (!mounted) return;
+
+        final displayFileName = photo.name.isNotEmpty ? photo.name : photo.path;
+
+        if (!extraction.success) {
+          setState(() {
+            _isProcessingOcr = false;
+            _isCustomImageUploaded = true;
+            _uploadedImagePath = displayFileName;
+            _isValidatedByOcr = false;
+            _isStrictVerified = false;
+            _ocrErrorMessage = extraction.errorMessage ?? 'Could not read meter readings from receipt.';
+            _ocrRawText = extraction.rawText;
+            _dateController.clear();
+            _timeController.clear();
+            _nozzle1Controller.clear();
+            _nozzle2Controller.clear();
+            _matchedSnippets = {};
+          });
+
+          showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: const Row(
+                children: [
+                  Icon(Icons.warning_amber_rounded, color: StationColors.accentOrange, size: 28),
+                  SizedBox(width: 8),
+                  Text('OCR Scan Incomplete', style: TextStyle(fontWeight: FontWeight.bold, color: StationColors.textDark)),
+                ],
+              ),
+              content: Text(
+                '${extraction.errorMessage ?? "Could not clearly identify nozzle CumVolume lines."}\n\nPlease verify that the receipt photo is flat, well-lit, and not blurred. You can retake the photo or enter values manually.',
+                style: const TextStyle(fontSize: 14, height: 1.4),
+              ),
+              actions: [
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: StationColors.primary),
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('OK', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+          );
+          return;
+        }
+
+        final state = context.read<StationStateProvider>();
+        final selectedPump = state.pumps.firstWhere(
+          (p) => p.id == _selectedPumpId,
+          orElse: () => state.pumps.first,
+        );
+
+        // Strict Wrong Pump validation gate
+        final receiptPumpSNo = extraction.pumpSerialNumber.trim();
+        final receiptFpId = extraction.fpId.trim();
+        final expectedSNo = selectedPump.serialNumber.trim();
+        final expectedFpId = selectedPump.id.replaceAll('pump_', '').trim();
+
+        final bool matchesSNo = receiptPumpSNo.isNotEmpty && receiptPumpSNo == expectedSNo;
+        final bool matchesFp = receiptFpId.isNotEmpty && receiptFpId == expectedFpId;
+
+        if (!matchesSNo && !matchesFp) {
+          setState(() {
+            _isProcessingOcr = false;
+            _isCustomImageUploaded = false;
+            _uploadedImagePath = null;
+            _isValidatedByOcr = false;
+            _isStrictVerified = false;
+            _dateController.clear();
+            _timeController.clear();
+            _nozzle1Controller.clear();
+            _nozzle2Controller.clear();
+            _matchedSnippets = {};
+            _ocrRawText = '';
+            _ocrErrorMessage = null;
+          });
+
+          showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: const Row(
+                children: [
+                  Icon(Icons.cancel_outlined, color: StationColors.errorRed, size: 28),
+                  SizedBox(width: 8),
+                  Text('Wrong pump', style: TextStyle(fontWeight: FontWeight.bold, color: StationColors.errorRed)),
+                ],
+              ),
+              content: Text(
+                'Wrong pump! The uploaded receipt has Pump SNo "$receiptPumpSNo" (FP ID: $receiptFpId), but ${selectedPump.name} (SNo: $expectedSNo) is currently selected.\n\nPlease upload the receipt corresponding to ${selectedPump.name}.',
+                style: const TextStyle(fontSize: 14, height: 1.4),
+              ),
+              actions: [
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: StationColors.errorRed),
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('OK', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+          );
+          return;
+        }
+
+        setState(() {
+          _isCustomImageUploaded = true;
+          _uploadedImagePath = displayFileName;
+          _isProcessingOcr = false;
+          _isValidatedByOcr = true;
+          _isStrictVerified = extraction.isStrictMatch;
+          _ocrConfidence = extraction.confidence;
+          _matchedSnippets = extraction.nozzleMatchedSnippet;
+          _ocrRawText = extraction.rawText;
+          _ocrErrorMessage = null;
+
+          if (extraction.date.isNotEmpty) {
+            _dateController.text = extraction.date;
+          }
+          if (extraction.time.isNotEmpty) {
+            _timeController.text = extraction.time;
+          }
+
+          if (extraction.nozzleLitres.containsKey(1)) {
+            _nozzle1Controller.text = (extraction.nozzleLitres[1]!).toStringAsFixed(3);
+          }
+          if (extraction.nozzleLitres.containsKey(2)) {
+            _nozzle2Controller.text = (extraction.nozzleLitres[2]!).toStringAsFixed(3);
+          }
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Receipt validated for ${selectedPump.name}! Extracted Date: ${_dateController.text}, Time: ${_timeController.text}, CumVolume readings.',
+            ),
+            backgroundColor: StationColors.successGreen,
+          ),
+        );
+      } catch (e) {
+        if (!mounted) return;
+        setState(() {
+          _isProcessingOcr = false;
+          _isCustomImageUploaded = true;
+          _uploadedImagePath = photo.path;
+          _isValidatedByOcr = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Receipt image captured. (OCR note: $e)'),
+            backgroundColor: StationColors.accentOrange,
+          ),
+        );
+      }
+    }
   }
 
   Widget _buildReceiptLine(String key, String value) {

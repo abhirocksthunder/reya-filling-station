@@ -138,6 +138,7 @@ class MyShiftScreen extends StatelessWidget {
                   ),
                 );
               } else {
+                state.setActiveScanPumpId(state.pumps.isNotEmpty ? state.pumps.first.id : 'pump_1');
                 onTabChange(1); // Switch to Scan tab
               }
             },
@@ -201,18 +202,36 @@ class MyShiftScreen extends StatelessWidget {
           const SizedBox(height: 24),
 
           // Last Recorded Readings Card
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                '${AppStrings.get('lastRecorded', lang)} • ${DateFormatter.formatDisplayDate(DateTime.now())}',
+          Builder(
+            builder: (context) {
+              DateTime? latestScanTime;
+              if (state.receipts.isNotEmpty) {
+                latestScanTime = state.receipts.first.capturedAt;
+              } else {
+                for (var pump in state.pumps) {
+                  for (var nozzle in pump.nozzles) {
+                    if (nozzle.previousReadingTimestamp != null) {
+                      if (latestScanTime == null || nozzle.previousReadingTimestamp!.isAfter(latestScanTime)) {
+                        latestScanTime = nozzle.previousReadingTimestamp;
+                      }
+                    }
+                  }
+                }
+              }
+
+              final String recordedText = latestScanTime != null
+                  ? '${AppStrings.get('lastRecorded', lang)} • ${DateFormatter.formatDisplayDate(latestScanTime)} ${DateFormatter.formatDisplayTime(latestScanTime)}'
+                  : '${AppStrings.get('lastRecorded', lang)} • Awaiting today\'s scan';
+
+              return Text(
+                recordedText,
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
                   color: StationColors.textDark,
                 ),
-              ),
-            ],
+              );
+            },
           ),
           const SizedBox(height: 2),
           Text(
@@ -224,38 +243,157 @@ class MyShiftScreen extends StatelessWidget {
           ),
           const SizedBox(height: 12),
 
-          // Nozzle 1 & Nozzle 2 Reading Tiles (Dynamic from state.pumps)
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(StationDimensions.cardRadius),
-              border: Border.all(color: StationColors.divider),
-            ),
-            child: Builder(
-              builder: (context) {
-                final pump = state.pumps.isNotEmpty ? state.pumps.first : null;
-                final n1 = (pump != null && pump.nozzles.isNotEmpty) ? pump.nozzles[0] : null;
-                final n2 = (pump != null && pump.nozzles.length > 1) ? pump.nozzles[1] : null;
-
-                return Column(
+          // Pump 1 & Pump 2 Nozzle Readings (Dynamic from state.pumps)
+          Column(
+            children: state.pumps.map((pump) {
+              return Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(StationDimensions.cardRadius),
+                  border: Border.all(color: StationColors.divider),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildReadingRow(
-                      label: n1 != null ? n1.displayName : 'Nozzle 1',
-                      reading: n1 != null ? n1.formattedReading : '0.000 L',
-                      sub: n1 != null ? '${n1.fuelType} • Rate ${n1.formattedRate}' : 'Petrol',
-                      onTap: () => onTabChange(1),
+                    // Pump Header
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFF7F9F9),
+                        borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+                        border: Border(bottom: BorderSide(color: StationColors.divider)),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Row(
+                              children: [
+                                const Icon(Icons.local_gas_station_outlined, color: StationColors.primary, size: 20),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    '${pump.name} (SNo: ${pump.serialNumber})',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: StationColors.textDark),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          TextButton.icon(
+                            icon: const Icon(Icons.camera_alt, size: 14),
+                            label: const Text('Scan Today', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                            onPressed: () {
+                              state.setActiveScanPumpId(pump.id);
+                              onTabChange(1);
+                            },
+                          ),
+                        ],
+                      ),
                     ),
-                    const Divider(height: 1, color: StationColors.divider),
-                    _buildReadingRow(
-                      label: n2 != null ? n2.displayName : 'Nozzle 2',
-                      reading: n2 != null ? n2.formattedReading : '0.000 L',
-                      sub: n2 != null ? '${n2.fuelType} • Rate ${n2.formattedRate}' : 'Diesel',
-                      onTap: () => onTabChange(1),
-                    ),
+                    // Nozzle rows
+                    ...pump.nozzles.map((n) {
+                      final hasTodayReading = n.currentTotaliserMl > n.previousAcceptedReadingMl;
+                      final dispensedMl = n.currentTotaliserMl - n.previousAcceptedReadingMl;
+
+                      return Column(
+                        children: [
+                          InkWell(
+                            onTap: () {
+                              state.setActiveScanPumpId(pump.id);
+                              onTabChange(1);
+                            },
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Wrap(
+                                          crossAxisAlignment: WrapCrossAlignment.center,
+                                          spacing: 6,
+                                          runSpacing: 2,
+                                          children: [
+                                            Text(
+                                              n.displayName,
+                                              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: StationColors.textDark),
+                                            ),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: n.fuelType == 'Petrol'
+                                                    ? StationColors.primaryLight.withOpacity(0.15)
+                                                    : StationColors.accentOrangeLight,
+                                                borderRadius: BorderRadius.circular(4),
+                                              ),
+                                              child: Text(
+                                                n.fuelType,
+                                                style: TextStyle(
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: n.fuelType == 'Petrol' ? StationColors.primary : StationColors.accentOrange,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          'Prev: ${n.formattedPreviousReading}',
+                                          style: const TextStyle(fontSize: 11, color: StationColors.textLight),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    children: [
+                                      Text(
+                                        n.formattedReading,
+                                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: StationColors.textDark),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      if (hasTodayReading) ...[
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: StationColors.successBg,
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: Text(
+                                            '+${VolumeFormatter.formatMl(dispensedMl)} today ✓',
+                                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: StationColors.successGreen),
+                                          ),
+                                        ),
+                                      ] else ...[
+                                        const Text(
+                                          'Awaiting today\'s scan',
+                                          style: TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: Colors.grey),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                  const SizedBox(width: 8),
+                                  const Icon(Icons.chevron_right, color: StationColors.textLight, size: 20),
+                                ],
+                              ),
+                            ),
+                          ),
+                          if (n != pump.nozzles.last)
+                            const Divider(height: 1, color: StationColors.divider),
+                        ],
+                      );
+                    }),
                   ],
-                );
-              },
-            ),
+                ),
+              );
+            }).toList(),
           ),
           const SizedBox(height: 24),
 

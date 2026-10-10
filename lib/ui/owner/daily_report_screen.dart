@@ -5,6 +5,7 @@ import '../../core/constants/dimensions.dart';
 import '../../core/formatting/currency_formatter.dart';
 import '../../l10n/app_strings.dart';
 import '../../services/station_state_provider.dart';
+import '../../models/transaction_entry.dart';
 
 class DailyReportScreen extends StatefulWidget {
   const DailyReportScreen({super.key});
@@ -68,6 +69,61 @@ class _DailyReportScreenState extends State<DailyReportScreen> {
     final state = context.watch<StationStateProvider>();
     final lang = state.currentLanguage;
     final report = state.sampleShiftReport;
+
+    // Filter entries by selected date (fallback to all active entries if date has none yet)
+    final dateFiltered = state.entries.where((e) {
+      final d = e.createdAt;
+      return d.year == _selectedDate.year && d.month == _selectedDate.month && d.day == _selectedDate.day;
+    }).toList();
+    final activeEntries = dateFiltered.isNotEmpty ? dateFiltered : state.entries;
+
+    int cashSales = 0;
+    int phonePeSales = 0;
+    int cardSales = 0;
+    int creditSales = 0;
+    int toOwner = 0;
+    int otherDebits = 0;
+    int foodExpenses = 0;
+
+    for (var e in activeEntries) {
+      if (e.direction == EntryDirection.received) {
+        switch (e.category) {
+          case EntryCategory.cash:
+            cashSales += e.amountPaise;
+            break;
+          case EntryCategory.phonePe:
+            phonePeSales += e.amountPaise;
+            break;
+          case EntryCategory.card:
+            cardSales += e.amountPaise;
+            break;
+          case EntryCategory.credit:
+            creditSales += e.amountPaise;
+            break;
+          default:
+            cashSales += e.amountPaise;
+        }
+      } else {
+        switch (e.category) {
+          case EntryCategory.toOwner:
+            toOwner += e.amountPaise;
+            break;
+          case EntryCategory.expense:
+            final ref = (e.reference ?? '').toLowerCase();
+            if (ref.contains('food') || ref.contains('curries') || ref.contains('tea')) {
+              foodExpenses += e.amountPaise;
+            } else {
+              otherDebits += e.amountPaise;
+            }
+            break;
+          default:
+            otherDebits += e.amountPaise;
+        }
+      }
+    }
+
+    final int dynamicRecordedSales = cashSales + phonePeSales + cardSales + creditSales;
+    final int dynamicPhonePeCard = phonePeSales + cardSales;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
@@ -184,23 +240,23 @@ class _DailyReportScreenState extends State<DailyReportScreen> {
           ),
           const SizedBox(height: 20),
 
-          // 4 Summary Metrics Cards
+          // 4 Summary Metrics Cards (Dynamically computed from live entries)
           Row(
             children: [
               Expanded(
-                child: _buildMetricCard('Recorded sales', '₹98,146', StationColors.textDark),
+                child: _buildMetricCard('Recorded sales', CurrencyFormatter.formatPaise(dynamicRecordedSales), StationColors.textDark),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: _buildMetricCard('PhonePe + card', '₹37,599', StationColors.primary),
+                child: _buildMetricCard('PhonePe + card', CurrencyFormatter.formatPaise(dynamicPhonePeCard), StationColors.primary),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: _buildMetricCard('Credit', '₹30,000', StationColors.creditTeal),
+                child: _buildMetricCard('Credit', CurrencyFormatter.formatPaise(creditSales), StationColors.creditTeal),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: _buildMetricCard('Cash given owner', '₹13,074', StationColors.accentOrange),
+                child: _buildMetricCard('Cash given owner', CurrencyFormatter.formatPaise(toOwner), StationColors.accentOrange),
               ),
             ],
           ),
@@ -323,7 +379,7 @@ class _DailyReportScreenState extends State<DailyReportScreen> {
                     const SizedBox(height: 16),
                     _buildRow('Handed over to owner', CurrencyFormatter.formatPaise(report.cashGivenToOwnerPaise), isBold: true),
                     const SizedBox(height: 8),
-                    _buildRow('Other cash debits', CurrencyFormatter.formatPaise(report.otherCashDebitsPaise), subnote: 'Category to confirm'),
+                    _buildRow('Other cash debits', CurrencyFormatter.formatPaise(report.otherCashDebitsPaise)),
                     const SizedBox(height: 8),
                     _buildRow('Food expenses', CurrencyFormatter.formatPaise(report.foodExpensesPaise)),
                     const Divider(height: 20),

@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import '../../core/constants/colors.dart';
 import '../../l10n/app_strings.dart';
 import '../../services/station_state_provider.dart';
+import '../../services/app_version_service.dart';
+import '../../widgets/biometric_setup_prompt.dart';
 import '../common/station_top_bar.dart';
 import 'my_shift_screen.dart';
 import 'scan_receipt_screen.dart';
@@ -20,6 +22,18 @@ class StaffShell extends StatefulWidget {
 
 class _StaffShellState extends State<StaffShell> {
   int _currentTabIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        final state = context.read<StationStateProvider>();
+        AppVersionService.checkAndPromptUpdate(context, state.settings);
+        BiometricSetupPrompt.checkAndShowPrompt(context, state.currentUser);
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {

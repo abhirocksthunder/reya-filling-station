@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/colors.dart';
 import '../../core/constants/dimensions.dart';
@@ -132,6 +133,8 @@ class _PeopleManagementScreenState extends State<PeopleManagementScreen> {
                   width: 260,
                   child: TextField(
                     controller: _searchCtrl,
+                    maxLength: 30,
+                    inputFormatters: [LengthLimitingTextInputFormatter(30)],
                     onChanged: (val) => setState(() {
                       _searchQuery = val;
                       _currentPage = 1;
@@ -139,6 +142,7 @@ class _PeopleManagementScreenState extends State<PeopleManagementScreen> {
                     decoration: InputDecoration(
                       hintText: 'Search name, phone, village...',
                       prefixIcon: const Icon(Icons.search, size: 18),
+                      counterText: '',
                       isDense: true,
                       contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
@@ -289,9 +293,27 @@ class _PeopleManagementScreenState extends State<PeopleManagementScreen> {
                             ],
                           ),
                         ),
-                        // 2. Phone
+                        // 2. Phone & Security PIN
                         DataCell(
-                          Text(u.phoneNumber, style: const TextStyle(fontSize: 13, color: StationColors.textDark)),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(u.phoneNumber, style: const TextStyle(fontSize: 13, color: StationColors.textDark)),
+                              const SizedBox(height: 3),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                decoration: BoxDecoration(
+                                  color: Colors.blueGrey.withOpacity(0.12),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  'PIN: ${u.securityPin}',
+                                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.blueGrey),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                         // 3. Role
                         DataCell(

@@ -39,6 +39,7 @@ class UserProfile {
   final bool active;
   final bool isOnline;
   final List<String> permissions;
+  final String securityPin; // Admin-configured 4-6 digit Security PIN
 
   const UserProfile({
     required this.id,
@@ -53,6 +54,7 @@ class UserProfile {
     this.active = true,
     this.isOnline = false,
     this.permissions = const [],
+    this.securityPin = '123456',
   });
 
   UserProfile copyWith({
@@ -68,6 +70,7 @@ class UserProfile {
     bool? active,
     bool? isOnline,
     List<String>? permissions,
+    String? securityPin,
   }) {
     return UserProfile(
       id: id ?? this.id,
@@ -82,6 +85,7 @@ class UserProfile {
       active: active ?? this.active,
       isOnline: isOnline ?? this.isOnline,
       permissions: permissions ?? this.permissions,
+      securityPin: securityPin ?? this.securityPin,
     );
   }
 
@@ -99,6 +103,7 @@ class UserProfile {
       'active': active,
       'isOnline': isOnline,
       'permissions': permissions,
+      'securityPin': securityPin,
     };
   }
 
@@ -119,6 +124,7 @@ class UserProfile {
       active: map['active'] ?? true,
       isOnline: map['isOnline'] ?? false,
       permissions: List<String>.from(map['permissions'] ?? []),
+      securityPin: map['securityPin'] ?? '123456',
     );
   }
 }

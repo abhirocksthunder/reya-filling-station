@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../core/constants/colors.dart';
 import '../../core/constants/dimensions.dart';
 import '../../models/user_profile.dart';
@@ -23,6 +24,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
   late TextEditingController _phoneController;
   late TextEditingController _villageController;
   late TextEditingController _addressController;
+  late TextEditingController _pinController;
 
   late UserRole _selectedRole;
   String? _selectedShift;
@@ -37,6 +39,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
     _phoneController = TextEditingController(text: u?.phoneNumber ?? '');
     _villageController = TextEditingController(text: u?.village ?? 'Chatrai');
     _addressController = TextEditingController(text: u?.address ?? 'Chatrai, Andhra Pradesh');
+    _pinController = TextEditingController(text: u?.securityPin ?? '123456');
 
     _selectedRole = u?.role ?? UserRole.shiftStaff;
     _selectedShift = u?.role == UserRole.owner ? null : (u?.assignedShift ?? 'Morning');
@@ -50,6 +53,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
     _phoneController.dispose();
     _villageController.dispose();
     _addressController.dispose();
+    _pinController.dispose();
     super.dispose();
   }
 
@@ -99,9 +103,12 @@ class _UserFormScreenState extends State<UserFormScreen> {
                   // Name
                   TextField(
                     controller: _nameController,
+                    maxLength: 30,
+                    inputFormatters: [LengthLimitingTextInputFormatter(30)],
                     decoration: InputDecoration(
                       labelText: 'Full Name *',
                       hintText: 'e.g. Kalyan Kumar Golla',
+                      counterText: '',
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                       prefixIcon: const Icon(Icons.person_outline),
                     ),
@@ -112,24 +119,53 @@ class _UserFormScreenState extends State<UserFormScreen> {
                   TextField(
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
+                    maxLength: 30,
+                    inputFormatters: [LengthLimitingTextInputFormatter(30)],
                     decoration: InputDecoration(
                       labelText: 'Email Address *',
                       hintText: 'e.g. kalyan@rfs.com',
+                      counterText: '',
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                       prefixIcon: const Icon(Icons.email_outlined),
                     ),
                   ),
                   const SizedBox(height: 16),
 
-                  // Phone Number
+                  // Phone Number (Strictly 10 digits)
                   TextField(
                     controller: _phoneController,
                     keyboardType: TextInputType.phone,
+                    maxLength: 10,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(10),
+                    ],
                     decoration: InputDecoration(
-                      labelText: 'Phone Number *',
-                      hintText: 'e.g. +91 98480 11111',
+                      labelText: 'Phone Number (10 Digits) *',
+                      hintText: 'e.g. 9848011111',
+                      counterText: '',
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                       prefixIcon: const Icon(Icons.phone_outlined),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Security PIN (Admin set, max 6 digits)
+                  TextField(
+                    controller: _pinController,
+                    keyboardType: TextInputType.number,
+                    maxLength: 6,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(6),
+                    ],
+                    decoration: InputDecoration(
+                      labelText: 'Security PIN (4-6 Digits) *',
+                      hintText: 'e.g. 123456',
+                      helperText: 'Admin configured PIN for station login (4-6 digits)',
+                      counterText: '',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      prefixIcon: const Icon(Icons.pin_outlined),
                     ),
                   ),
                   const SizedBox(height: 20),
@@ -194,9 +230,12 @@ class _UserFormScreenState extends State<UserFormScreen> {
                   // Village
                   TextField(
                     controller: _villageController,
+                    maxLength: 30,
+                    inputFormatters: [LengthLimitingTextInputFormatter(30)],
                     decoration: InputDecoration(
                       labelText: 'Village / Town *',
                       hintText: 'e.g. Chatrai',
+                      counterText: '',
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                       prefixIcon: const Icon(Icons.location_city_outlined),
                     ),
@@ -207,9 +246,12 @@ class _UserFormScreenState extends State<UserFormScreen> {
                   TextField(
                     controller: _addressController,
                     maxLines: 2,
+                    maxLength: 30,
+                    inputFormatters: [LengthLimitingTextInputFormatter(30)],
                     decoration: InputDecoration(
                       labelText: 'Address Details',
                       hintText: 'House no, Street, Landmark',
+                      counterText: '',
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                       prefixIcon: const Icon(Icons.home_outlined),
                     ),
@@ -273,11 +315,20 @@ class _UserFormScreenState extends State<UserFormScreen> {
                                 return;
                               }
 
+                              final pin = _pinController.text.trim();
+                              if (pin.length < 4 || pin.length > 6 || int.tryParse(pin) == null) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Security PIN must be 4 to 6 numeric digits.')),
+                                );
+                                return;
+                              }
+
                               final profile = UserProfile(
                                 id: widget.userToEdit?.id ?? 'user_${DateTime.now().millisecondsSinceEpoch}',
                                 name: _nameController.text.trim(),
                                 email: _emailController.text.trim(),
                                 phoneNumber: _phoneController.text.trim(),
+                                securityPin: pin,
                                 role: _selectedRole,
                                 assignedShift: _selectedRole == UserRole.owner ? null : _selectedShift,
                                 village: _villageController.text.trim(),

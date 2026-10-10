@@ -18,18 +18,18 @@
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A new Flutter project.">
+  <meta name="description" content="Reya Filling Station (Chatrai) Forecourt & Station Management">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="reya_filling_station">
+  <meta name="apple-mobile-web-app-title" content="Reya Filling Station">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
 
-  <title>reya_filling_station</title>
+  <title>Reya Filling Station</title>
   <link rel="manifest" href="manifest.json">
 </head>
 <body>
@@ -41,6 +41,95 @@
     For more details:
     * https://docs.flutter.dev/platform-integration/web/initialization
   -->
-  <script src="flutter_bootstrap.js" async></script>
+  <!-- Tesseract.js for In-Browser Receipt OCR on Web -->
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function(registrations) {
+        for (var i = 0; i < registrations.length; i++) {
+          registrations[i].update();
+        }
+      });
+    }
+
+    // High-Precision In-Browser Thermal Receipt OCR Engine
+    window.performWebOcr = function(imageUrl, onSuccess, onError) {
+      if (typeof Tesseract === 'undefined') {
+        console.warn('Tesseract.js is not loaded yet');
+        if (onError) onError('Tesseract.js is not loaded');
+        return;
+      }
+
+      console.log('Starting In-Browser Web OCR for image...');
+      var img = new Image();
+      img.crossOrigin = 'anonymous';
+
+      img.onload = function() {
+        try {
+          var canvas = document.createElement('canvas');
+          var ctx = canvas.getContext('2d');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          ctx.drawImage(img, 0, 0);
+
+          // Contrast enhancement for thermal receipts
+          var imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          var d = imgData.data;
+          for (var i = 0; i < d.length; i += 4) {
+            var gray = d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114;
+            // Adaptive binarization: boost faint thermal printing
+            var val = gray < 165 ? 0 : 255;
+            d[i] = val;
+            d[i + 1] = val;
+            d[i + 2] = val;
+          }
+          ctx.putImageData(imgData, 0, 0);
+
+          Tesseract.recognize(canvas, 'eng')
+            .then(function(result) {
+              var text = (result && result.data && result.data.text) ? result.data.text : '';
+              console.log('Web Tesseract OCR Success. Recognized text length:', text.length);
+              if (onSuccess) onSuccess(text);
+            })
+            .catch(function(err) {
+              console.warn('Canvas OCR recognition failed, trying direct image:', err);
+              Tesseract.recognize(imageUrl, 'eng')
+                .then(function(res2) {
+                  var text2 = (res2 && res2.data && res2.data.text) ? res2.data.text : '';
+                  if (onSuccess) onSuccess(text2);
+                })
+                .catch(function(err2) {
+                  if (onError) onError(err2 ? err2.toString() : 'OCR recognition error');
+                });
+            });
+        } catch (e) {
+          console.warn('Canvas processing exception, trying direct image:', e);
+          Tesseract.recognize(imageUrl, 'eng')
+            .then(function(res) {
+              var text = (res && res.data && res.data.text) ? res.data.text : '';
+              if (onSuccess) onSuccess(text);
+            })
+            .catch(function(err) {
+              if (onError) onError(err ? err.toString() : 'Direct OCR error');
+            });
+        }
+      };
+
+      img.onerror = function(err) {
+        console.warn('Image load failed, attempting direct recognize:', err);
+        Tesseract.recognize(imageUrl, 'eng')
+          .then(function(res) {
+            var text = (res && res.data && res.data.text) ? res.data.text : '';
+            if (onSuccess) onSuccess(text);
+          })
+          .catch(function(err2) {
+            if (onError) onError(err2 ? err2.toString() : 'Image load error');
+          });
+      };
+
+      img.src = imageUrl;
+    };
+  </script>
+  <script src="flutter_bootstrap.js?v=1.0.4.5" async></script>
 </body>
 </html>

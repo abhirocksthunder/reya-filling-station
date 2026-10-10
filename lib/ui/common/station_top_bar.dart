@@ -6,6 +6,7 @@ import '../../core/formatting/date_formatter.dart';
 import '../../l10n/app_strings.dart';
 import '../../models/user_profile.dart';
 import '../../services/station_state_provider.dart';
+import '../../widgets/version_footer.dart';
 
 class StationTopBar extends StatelessWidget implements PreferredSizeWidget {
   final VoidCallback? onNotificationTap;
@@ -45,15 +46,23 @@ class StationTopBar extends StatelessWidget implements PreferredSizeWidget {
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(
-              AppStrings.get('appName', lang),
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: StationColors.textDark,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                letterSpacing: -0.3,
-              ),
+            child: Row(
+              children: [
+                Flexible(
+                  child: Text(
+                    AppStrings.get('appName', lang),
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: StationColors.textDark,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: -0.3,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const VersionFooter(compact: true),
+              ],
             ),
           ),
         ],

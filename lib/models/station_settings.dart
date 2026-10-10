@@ -56,6 +56,11 @@ class StationSettings {
   final List<CategoryItem> categories;
   final Map<String, String> shiftTimings;
   final String defaultLanguage; // "te" or "en"
+  final String latestVersion; // Target release version e.g. "1.0.2"
+  final int latestBuildNumber; // Target versionCode e.g. 3
+  final String updateUrl; // Link to download the updated APK
+  final bool forceUpdate; // If true, older app versions must update before continuing
+  final String releaseNotes; // Summary of improvements for the user
 
   const StationSettings({
     this.stationName = 'Reya Filling Station (Chatrai)',
@@ -79,6 +84,11 @@ class StationSettings {
       'Night': '10:00 PM - 6:00 AM',
     },
     this.defaultLanguage = 'te',
+    this.latestVersion = '1.0.4',
+    this.latestBuildNumber = 5,
+    this.updateUrl = '/static/reya-filling-station.apk',
+    this.forceUpdate = true,
+    this.releaseNotes = 'Added camera slip capture, biometric quick login, hardened IndianOil forecourt OCR, and persistent session support.',
   });
 
   // Backward compatibility getter
@@ -96,6 +106,11 @@ class StationSettings {
     List<CategoryItem>? categories,
     Map<String, String>? shiftTimings,
     String? defaultLanguage,
+    String? latestVersion,
+    int? latestBuildNumber,
+    String? updateUrl,
+    bool? forceUpdate,
+    String? releaseNotes,
   }) {
     return StationSettings(
       stationName: stationName ?? this.stationName,
@@ -107,6 +122,11 @@ class StationSettings {
       categories: categories ?? this.categories,
       shiftTimings: shiftTimings ?? this.shiftTimings,
       defaultLanguage: defaultLanguage ?? this.defaultLanguage,
+      latestVersion: latestVersion ?? this.latestVersion,
+      latestBuildNumber: latestBuildNumber ?? this.latestBuildNumber,
+      updateUrl: updateUrl ?? this.updateUrl,
+      forceUpdate: forceUpdate ?? this.forceUpdate,
+      releaseNotes: releaseNotes ?? this.releaseNotes,
     );
   }
 
@@ -120,6 +140,11 @@ class StationSettings {
     'categories': categories.map((c) => c.toMap()).toList(),
     'shiftTimings': shiftTimings,
     'defaultLanguage': defaultLanguage,
+    'latestVersion': latestVersion,
+    'latestBuildNumber': latestBuildNumber,
+    'updateUrl': updateUrl,
+    'forceUpdate': forceUpdate,
+    'releaseNotes': releaseNotes,
   };
 
   factory StationSettings.fromMap(Map<String, dynamic> map) {
@@ -152,6 +177,11 @@ class StationSettings {
         'Night': '10:00 PM - 6:00 AM',
       },
       defaultLanguage: map['defaultLanguage'] ?? 'te',
+      latestVersion: map['latestVersion'] ?? '1.0.4',
+      latestBuildNumber: (map['latestBuildNumber'] as num?)?.toInt() ?? 5,
+      updateUrl: map['updateUrl'] ?? '/static/reya-filling-station.apk',
+      forceUpdate: map['forceUpdate'] ?? true,
+      releaseNotes: map['releaseNotes'] ?? 'Added camera slip capture, biometric quick login, and persistent session support.',
     );
   }
 }

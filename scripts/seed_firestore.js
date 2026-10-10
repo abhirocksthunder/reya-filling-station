@@ -50,6 +50,11 @@ async function seed() {
     checkLocationBeforeScan: { booleanValue: true },
     allowStaffTotaliserCameraScan: { booleanValue: true },
     defaultLanguage: { stringValue: 'te' },
+    latestVersion: { stringValue: '1.0.2' },
+    latestBuildNumber: { integerValue: '3' },
+    updateUrl: { stringValue: '/static/reya-filling-station.apk' },
+    forceUpdate: { booleanValue: true },
+    releaseNotes: { stringValue: 'Added camera slip capture, biometric quick login, and persistent session support.' },
     shiftTimings: {
       mapValue: {
         fields: {
