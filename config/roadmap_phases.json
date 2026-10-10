@@ -1,0 +1,103 @@
+{
+  "schema_version": "aipcc-roadmap-phases-v2",
+  "canonical_source": true,
+  "project": "reya-filling-station",
+  "project_name": "Reya Filling Station",
+  "source_of_truth_note": "This file is the canonical roadmap source for this project. AIPCC aggregates this file into the central dashboard.",
+  "archive_dir": "docs/archive/roadmaps",
+  "items": [
+    {
+      "id": "reya-filling-station-phase-1",
+      "project": "reya-filling-station",
+      "project_name": "Reya Filling Station",
+      "domain": "Reya Filling Station",
+      "stage": "Phase 1 Completed",
+      "title": "Forecourt Mobile Shell, Owner Operations Portal & Exact Reconciliation Engine",
+      "status": "done",
+      "summary": "**Phase 1**: **Forecourt Mobile Shell, Owner Operations Portal & Exact Integer Engine**",
+      "deliverables": [
+        "Rural-first mobile forecourt shell (Telugu and English) with 56-64px touch targets",
+        "Authoritative integer paise & millilitres calculation engine with 14 passing automated tests",
+        "IndianOil hierarchical receipt OCR parser with date plausibility and SHA-256 deduplication",
+        "Uncertainty-aware 150m station geofence boundary evaluator",
+        "Responsive desktop Owner operations portal covering overview, receipt inbox, shift reviews, money ledger, credit khata, people, pumps, and daily reports",
+        "Zero-trust Firestore security rules, compound indexes, and Cloud Storage security configuration",
+        "Compiled Web release and installable Android debug APK (app-debug.apk)"
+      ],
+      "gates": [
+        "Project Guardian gate passes",
+        "All 14 unit and widget tests passing",
+        "Flutter web compilation successful",
+        "Android APK compilation successful"
+      ],
+      "next_action": "Begin Phase 2: Live Firebase Auth Phone OTP binding and Cloud Functions integration."
+    }
+  ],
+  "changes": [
+    {
+      "id": "2026-10-10-reya-filling-station-core-implementation",
+      "project": "reya-filling-station",
+      "project_name": "Reya Filling Station",
+      "timestamp": "2026-10-10T14:20:00.000000+05:30",
+      "timestamp_ist": "10 Oct 2026 2:20 pm",
+      "date": "2026-10-10",
+      "domain": "Reya Filling Station",
+      "type": "feature",
+      "status": "done",
+      "title": "Deliver Production Flutter App, Owner Operations Portal, and Exact Reconciliation Engine",
+      "summary": "Implemented dual-mode Flutter cross-platform architecture with rural-first forecourt mobile shell (Telugu/EN), responsive Owner portal (9 views), IndianOil hierarchical OCR parser, 150m geofence calculator, exact integer paise/mL engine, and passed all 14 tests, Web build, and Android APK build.",
+      "impact": "Delivers a completely functional, test-verified forecourt operational and financial reconciliation system matching physical notebook ledgers and dispenser printouts with zero floating-point drift.",
+      "related_phase_id": "reya-filling-station-phase-1",
+      "docs": [
+        "docs/specs/technical-architecture.md",
+        "docs/decisions/adr-001-initial-architecture.md",
+        "README.md",
+        "progress.md"
+      ],
+      "files": [
+        "lib/main.dart",
+        "lib/core/formatting/currency_formatter.dart",
+        "lib/core/formatting/volume_formatter.dart",
+        "lib/core/formatting/date_formatter.dart",
+        "lib/services/reconciliation_service.dart",
+        "lib/services/ocr_parser_service.dart",
+        "lib/services/location_service.dart",
+        "lib/services/station_state_provider.dart",
+        "lib/ui/staff/staff_shell.dart",
+        "lib/ui/owner/owner_shell.dart",
+        "firestore.rules",
+        "storage.rules",
+        "firebase.json"
+      ],
+      "tests": [
+        "flutter test",
+        "flutter build web",
+        "flutter build apk --debug"
+      ]
+    },
+    {
+      "id": "2026-10-10-reya-filling-station-baseline-governance",
+      "project": "reya-filling-station",
+      "project_name": "Reya Filling Station",
+      "timestamp": "2026-10-10T13:58:51.776477+05:30",
+      "timestamp_ist": "10 Oct 2026 1:58 pm",
+      "date": "2026-10-10",
+      "domain": "Reya Filling Station",
+      "type": "documentation",
+      "status": "done",
+      "title": "Standardize Reya Filling Station Roadmap and IST Change Log",
+      "summary": "Initialized canonical config/roadmap_phases.json and progress.md recent changes tracking aligned with AIPCC Project Guardian.",
+      "impact": "Enables unified multi-project change tracking with exact IST timestamps and automated gate enforcement.",
+      "related_phase_id": "reya-filling-station-phase-1",
+      "docs": [
+        "progress.md"
+      ],
+      "files": [
+        "config/roadmap_phases.json"
+      ],
+      "tests": [
+        "python scripts/sync_project_guardian_docs.py --project reya-filling-station"
+      ]
+    }
+  ]
+}
