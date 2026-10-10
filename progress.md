@@ -20,6 +20,25 @@
 
 ## Recent Changes (IST)
 
+### 10 Oct 2026 2:56 pm — Resolve 13 Forecourt UI/UX, Zero-Trust Login, Data Isolation, and Layout Bugs
+- **Project**: `reya-filling-station`
+- **Type**: `bugfix` | **Status**: `done`
+- **Summary**: Enforced authentic LoginScreen gate, configured authoritative owners Kalyan and Ranjit, eliminated cross-user data leakage and persona dropdowns, added dedicated UserFormScreen with shift hiding for owners, reordered People columns with Edit/Delete actions, added 10-item pagination everywhere, fixed mobile drawer menu contrast, fixed Forecourt view layout collapse on Web, and purged demo labels.
+- **Impact**: Production-grade usability for rural and owner operations with zero unauthenticated leakage, strict data isolation, intuitive responsive navigation, and seamless Firestore real-time synchronization.
+- **Modified Files**:
+  - `lib/main.dart`
+  - `lib/services/station_state_provider.dart`
+  - `lib/ui/auth/login_screen.dart`
+  - `lib/ui/owner/owner_shell.dart`
+  - `lib/ui/owner/people_management_screen.dart`
+  - `lib/ui/owner/user_form_screen.dart`
+  - `lib/ui/owner/credit_khata_screen.dart`
+  - `lib/ui/owner/receipt_inbox_screen.dart`
+  - `lib/ui/staff/staff_shell.dart`
+  - `lib/ui/staff/money_entries_screen.dart`
+  - `lib/ui/common/station_top_bar.dart`
+  - `lib/ui/common/pagination_control.dart`
+
 ### 10 Oct 2026 2:20 pm — Deliver Production Flutter App, Owner Operations Portal, and Exact Reconciliation Engine
 - **Project**: `reya-filling-station`
 - **Type**: `feature` | **Status**: `done`

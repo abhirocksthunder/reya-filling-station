@@ -5,6 +5,7 @@ import '../../core/constants/dimensions.dart';
 import '../../l10n/app_strings.dart';
 import '../../models/receipt_scan.dart';
 import '../../services/station_state_provider.dart';
+import '../common/pagination_control.dart';
 
 class ReceiptInboxScreen extends StatefulWidget {
   const ReceiptInboxScreen({super.key});
@@ -15,13 +16,25 @@ class ReceiptInboxScreen extends StatefulWidget {
 
 class _ReceiptInboxScreenState extends State<ReceiptInboxScreen> {
   int _selectedIndex = 0;
+  int _currentPage = 1;
+  static const int _pageSize = 10;
 
   @override
   Widget build(BuildContext context) {
     final state = context.watch<StationStateProvider>();
     final lang = state.currentLanguage;
     final receipts = state.receipts;
-    final selectedScan = receipts.isNotEmpty ? receipts[_selectedIndex.clamp(0, receipts.length - 1)] : null;
+
+    final totalItems = receipts.length;
+    final int startIndex = (_currentPage - 1) * _pageSize;
+    final int endIndex = (startIndex + _pageSize).clamp(0, totalItems);
+    final displayedReceipts = (startIndex < totalItems)
+        ? receipts.sublist(startIndex, endIndex)
+        : <ReceiptScan>[];
+
+    final selectedScan = displayedReceipts.isNotEmpty
+        ? displayedReceipts[_selectedIndex.clamp(0, displayedReceipts.length - 1)]
+        : null;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
@@ -72,7 +85,7 @@ class _ReceiptInboxScreenState extends State<ReceiptInboxScreen> {
               if (!isWide) {
                 return Column(
                   children: [
-                    _buildReceiptsList(receipts),
+                    _buildReceiptsList(displayedReceipts, totalItems),
                     const SizedBox(height: 20),
                     if (selectedScan != null) _buildReviewPane(context, selectedScan, lang),
                   ],
@@ -85,7 +98,7 @@ class _ReceiptInboxScreenState extends State<ReceiptInboxScreen> {
                   // Left List
                   SizedBox(
                     width: 320,
-                    child: _buildReceiptsList(receipts),
+                    child: _buildReceiptsList(displayedReceipts, totalItems),
                   ),
                   const SizedBox(width: 20),
                   // Right Detail Pane
@@ -103,13 +116,15 @@ class _ReceiptInboxScreenState extends State<ReceiptInboxScreen> {
     );
   }
 
-  Widget _buildReceiptsList(List<ReceiptScan> receipts) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(StationDimensions.cardRadius),
-        border: Border.all(color: StationColors.divider),
-      ),
+  Widget _buildReceiptsList(List<ReceiptScan> receipts, int totalItems) {
+    return Column(
+      children: [
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(StationDimensions.cardRadius),
+            border: Border.all(color: StationColors.divider),
+          ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -171,7 +186,7 @@ class _ReceiptInboxScreenState extends State<ReceiptInboxScreen> {
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: Text(
-                                r.validationStatus == ReceiptValidationStatus.valid ? 'Pending review' : 'Historical sample',
+                                r.validationStatus == ReceiptValidationStatus.valid ? 'Pending review' : 'Accepted reading',
                                 style: TextStyle(
                                   fontSize: 10,
                                   fontWeight: FontWeight.bold,
@@ -191,8 +206,22 @@ class _ReceiptInboxScreenState extends State<ReceiptInboxScreen> {
           ),
         ],
       ),
-    );
-  }
+    ),
+    const SizedBox(height: 12),
+    PaginationControl(
+      currentPage: _currentPage,
+      totalItems: totalItems,
+      pageSize: _pageSize,
+      onPageChanged: (newPage) {
+        setState(() {
+          _currentPage = newPage;
+          _selectedIndex = 0;
+        });
+      },
+    ),
+  ],
+);
+}
 
   Widget _buildReviewPane(BuildContext context, ReceiptScan scan, String lang) {
     return Container(

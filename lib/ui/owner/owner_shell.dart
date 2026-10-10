@@ -55,6 +55,7 @@ class _OwnerShellState extends State<OwnerShell> {
             // Mobile / Tablet Drawer Layout
             return Scaffold(
               drawer: Drawer(
+                backgroundColor: StationColors.primaryDark,
                 child: _buildSidebarContent(lang),
               ),
               appBar: AppBar(

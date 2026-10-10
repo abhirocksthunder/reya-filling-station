@@ -89,7 +89,7 @@ class DailyReportScreen extends StatelessWidget {
                 ),
                 child: const Row(
                   children: [
-                    Text('Evening • Sample', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    Text('Evening Shift', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                     SizedBox(width: 4),
                     Icon(Icons.arrow_drop_down, size: 18),
                   ],
@@ -299,11 +299,11 @@ class DailyReportScreen extends StatelessWidget {
                 const SizedBox(height: 14),
                 Row(
                   children: [
-                    _buildAuditPoint('Srikant', 'Sample shift entry\n9 Oct 2026, 10:00 pm'),
+                    _buildAuditPoint('Srikant', 'Shift entry\n9 Oct 2026, 10:00 pm'),
                     Expanded(child: Container(height: 2, color: StationColors.primary)),
                     _buildAuditPoint('Owner handover', '₹13,074\n9 Oct 2026'),
                     Expanded(child: Container(height: 2, color: StationColors.primary)),
-                    _buildAuditPoint('Receipt sample', 'Pump 1\n9 Oct 2026, 9:50 pm'),
+                    _buildAuditPoint('Totaliser reading', 'Pump 1\n9 Oct 2026, 9:50 pm'),
                   ],
                 ),
                 const SizedBox(height: 16),

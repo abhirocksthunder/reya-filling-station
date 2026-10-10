@@ -52,9 +52,9 @@ class _MoneyEntriesScreenState extends State<MoneyEntriesScreen> {
             ),
           ),
           const SizedBox(height: 4),
-          const Text(
-            '10 Oct 2026 • Demo',
-            style: TextStyle(fontSize: 14, color: StationColors.textMedium),
+          Text(
+            '${state.activeShift.businessDate} • ${state.activeShift.shiftName} shift',
+            style: const TextStyle(fontSize: 14, color: StationColors.textMedium),
           ),
           const SizedBox(height: 16),
 
@@ -325,65 +325,87 @@ class _MoneyEntriesScreenState extends State<MoneyEntriesScreen> {
           ),
           const SizedBox(height: 28),
 
-          // Recent Entries in Shift
+          // Recent Entries in Shift (Strict user data isolation)
           const Text(
             'Recorded in this shift',
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: StationColors.textDark),
           ),
           const SizedBox(height: 10),
-          ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: state.entries.take(5).length,
-            separatorBuilder: (_, __) => const SizedBox(height: 8),
-            itemBuilder: (context, idx) {
-              final item = state.entries[idx];
-              bool isReceived = item.direction == EntryDirection.received;
-              return Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: StationColors.divider),
-                ),
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 16,
-                      backgroundColor: isReceived ? StationColors.successBg : StationColors.errorBg,
-                      child: Icon(
-                        isReceived ? Icons.arrow_downward : Icons.arrow_upward,
-                        size: 16,
-                        color: isReceived ? StationColors.successGreen : StationColors.errorRed,
-                      ),
+          Builder(
+            builder: (context) {
+              final entries = state.userEntries;
+              if (entries.isEmpty) {
+                return Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: StationColors.divider),
+                  ),
+                  child: const Center(
+                    child: Text(
+                      'No money entries recorded yet for your shift.',
+                      style: TextStyle(color: StationColors.textLight, fontSize: 13),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            item.category.displayName,
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                  ),
+                );
+              }
+              return ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: entries.take(10).length,
+                separatorBuilder: (_, __) => const SizedBox(height: 8),
+                itemBuilder: (context, idx) {
+                  final item = entries[idx];
+                  bool isReceived = item.direction == EntryDirection.received;
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: StationColors.divider),
+                    ),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 16,
+                          backgroundColor: isReceived ? StationColors.successBg : StationColors.errorBg,
+                          child: Icon(
+                            isReceived ? Icons.arrow_downward : Icons.arrow_upward,
+                            size: 16,
+                            color: isReceived ? StationColors.successGreen : StationColors.errorRed,
                           ),
-                          if (item.reference != null && item.reference!.isNotEmpty)
-                            Text(
-                              item.reference!,
-                              style: const TextStyle(fontSize: 12, color: StationColors.textLight),
-                            ),
-                        ],
-                      ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                item.category.displayName,
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                              ),
+                              if (item.reference != null && item.reference!.isNotEmpty)
+                                Text(
+                                  item.reference!,
+                                  style: const TextStyle(fontSize: 12, color: StationColors.textLight),
+                                ),
+                            ],
+                          ),
+                        ),
+                        Text(
+                          CurrencyFormatter.formatPaise(item.amountPaise),
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 15,
+                            color: isReceived ? StationColors.textDark : StationColors.accentOrange,
+                          ),
+                        ),
+                      ],
                     ),
-                    Text(
-                      CurrencyFormatter.formatPaise(item.amountPaise),
-                      style: TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 15,
-                        color: isReceived ? StationColors.textDark : StationColors.accentOrange,
-                      ),
-                    ),
-                  ],
-                ),
+                  );
+                },
               );
             },
           ),

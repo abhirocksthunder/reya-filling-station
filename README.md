@@ -11,11 +11,15 @@ A rural-first petrol filling station management, meter reading capture, and fina
 
 ## 🌟 Key Capabilities
 
-1. **Rural-First forecourt Usability**:
+1. **Rural-First Forecourt Usability & Zero-Trust Authentication**:
    - High-contrast color palette (`#0C4A4D` Deep Forest Teal & `#E65100` Action Orange) readable in blinding direct sunlight.
    - Large 56px–64px tactile touch targets for one-handed thumb interaction and forecourt gloves.
    - Instant dual-language toggle (**Telugu `తెలుగు`** & **English `EN`**).
    - Replaced accounting abstractions with physical notebook concepts: *"Cash with me"*, *"Cash given to owner"*, *"ph.p"*, *"swiping"*, *"N.C"*, and *"curries/food"*.
+   - **Zero-Trust Login Gate**: Enforced authentic sign-in via `LoginScreen` for both mobile and web. Unauthenticated sessions are strictly blocked.
+   - **Role-Based Isolation**: Staff only see their own assigned shift, pump, and money entries. Authoritative station owners (**Kalyan** & **Ranjit**) access the full operations portal.
+   - **Dedicated User Management**: Full-page `UserFormScreen` allowing owners to add and edit users, roles, emails, phone numbers, villages, and addresses. Shift assignment is automatically hidden for Owner roles.
+   - **10-Item Pagination Mandate**: `PaginationControl` widget with 44px+ touch targets and range display integrated across People Management, Credit Khata, Receipts Inbox, and Money Ledger.
 
 2. **Hierarchical IndianOil OCR Pipeline**:
    - Automatically parses IndianOil dispenser printout slips (`FP. ID`, `Pump SNo`, `Date: dd/MM/yyyy`, `Time: HH:mm:ss`).
@@ -32,10 +36,11 @@ A rural-first petrol filling station management, meter reading capture, and fina
    - Granular Firestore security rules with commit-time membership validation (`owner`, `manager`, `shiftStaff`).
    - Clients cannot forge accepted readings; immutable reading history and latest pointers are strictly backend-managed.
    - 150m uncertainty-aware geofence boundary calculation (`Distance + Accuracy <= 150m`).
+   - Real-time Firestore synchronization for members, entries, and scan attempts.
 
 5. **Complete Dual-Experience Shell**:
    - **Staff Forecourt Shell**: My Shift, Scan Receipt, Money Entries, Close Shift.
-   - **Owner Operations Portal**: Station Overview, Receipt Inbox, Shift Reviews, Daily Money Ledger, Credit Khata (Sri Sai Travels, School Bus), People & Roles, Pumps Setup, Station Settings, and Daily Station Reports.
+   - **Owner Operations Portal**: Station Overview, Receipt Inbox, Shift Reviews, Daily Money Ledger, Credit Khata, People & Roles, Pumps Setup, Station Settings, and Daily Station Reports.
 
 ---
 
@@ -68,7 +73,7 @@ A rural-first petrol filling station management, meter reading capture, and fina
 - **Dart SDK**: `>= 3.11.5`
 - **Firebase CLI**: `>= 15.18.0`
 
-### 2. Run Automated Test Suite (14 Tests)
+### 2. Run Automated Test Suite (16 Tests)
 ```bash
 flutter test
 ```
@@ -76,7 +81,7 @@ Validates:
 - `test/reconciliation_test.dart` (Exact integer paise/mL, fuel sales formulas, zero cash variance, boundary errors)
 - `test/ocr_parser_test.dart` (IndianOil hierarchical parsing, SHA-256 deduplication, date validation)
 - `test/location_boundary_test.dart` (150m uncertainty geofence logic, GPS accuracy bounds)
-- `test/widget_test.dart` (Forecourt UI rendering)
+- `test/widget_test.dart` (Zero-Trust login gate, StaffShell forecourt controls, OwnerShell operations portal)
 
 ### 3. Build & Run Responsive Web Distribution
 ```bash

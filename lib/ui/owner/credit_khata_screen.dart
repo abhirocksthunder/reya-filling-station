@@ -6,6 +6,7 @@ import '../../core/formatting/currency_formatter.dart';
 import '../../l10n/app_strings.dart';
 import '../../models/credit_customer.dart';
 import '../../services/station_state_provider.dart';
+import '../common/pagination_control.dart';
 
 class CreditKhataScreen extends StatefulWidget {
   const CreditKhataScreen({super.key});
@@ -16,6 +17,8 @@ class CreditKhataScreen extends StatefulWidget {
 
 class _CreditKhataScreenState extends State<CreditKhataScreen> {
   int _selectedCustomerIdx = 0;
+  int _currentPage = 1;
+  static const int _pageSize = 10;
   final TextEditingController _paymentAmountController = TextEditingController(text: '5,000');
   String _paymentMode = 'Cash';
 
@@ -30,9 +33,19 @@ class _CreditKhataScreenState extends State<CreditKhataScreen> {
     final state = context.watch<StationStateProvider>();
     final lang = state.currentLanguage;
     final customers = state.creditCustomers;
-    final customer = customers[_selectedCustomerIdx.clamp(0, customers.length - 1)];
 
     int totalOutstanding = customers.fold(0, (sum, c) => sum + c.pendingAmountPaise);
+
+    final totalItems = customers.length;
+    final int startIndex = (_currentPage - 1) * _pageSize;
+    final int endIndex = (startIndex + _pageSize).clamp(0, totalItems);
+    final displayedCustomers = (startIndex < totalItems)
+        ? customers.sublist(startIndex, endIndex)
+        : <CreditCustomer>[];
+
+    final customer = displayedCustomers.isNotEmpty
+        ? displayedCustomers[_selectedCustomerIdx.clamp(0, displayedCustomers.length - 1)]
+        : (customers.isNotEmpty ? customers.first : null);
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
@@ -43,16 +56,9 @@ class _CreditKhataScreenState extends State<CreditKhataScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    AppStrings.get('customersYetToPay', lang),
-                    style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: StationColors.textDark),
-                  ),
-                  const SizedBox(height: 2),
-                  const Text('Demo • UI review', style: TextStyle(fontSize: 14, color: StationColors.textMedium)),
-                ],
+              Text(
+                AppStrings.get('customersYetToPay', lang),
+                style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: StationColors.textDark),
               ),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
@@ -61,7 +67,7 @@ class _CreditKhataScreenState extends State<CreditKhataScreen> {
                     CurrencyFormatter.formatPaise(totalOutstanding),
                     style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w900, color: StationColors.accentOrange),
                   ),
-                  const Text('Illustrative outstanding credit', style: TextStyle(fontSize: 12, color: StationColors.textLight)),
+                  const Text('Outstanding balance', style: TextStyle(fontSize: 12, color: StationColors.textLight)),
                 ],
               ),
             ],
@@ -73,194 +79,213 @@ class _CreditKhataScreenState extends State<CreditKhataScreen> {
             builder: (context, constraints) {
               bool isWide = constraints.maxWidth > 750;
 
-              Widget customersList = Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(StationDimensions.cardRadius),
-                  border: Border.all(color: StationColors.divider),
-                ),
-                child: ListView.separated(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: customers.length,
-                  separatorBuilder: (_, __) => const Divider(height: 1, color: StationColors.divider),
-                  itemBuilder: (context, i) {
-                    final c = customers[i];
-                    bool isSelected = i == _selectedCustomerIdx;
+              Widget customersList = Column(
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(StationDimensions.cardRadius),
+                      border: Border.all(color: StationColors.divider),
+                    ),
+                    child: displayedCustomers.isEmpty
+                        ? const Padding(
+                            padding: EdgeInsets.all(24),
+                            child: Center(child: Text('No credit customers registered.')),
+                          )
+                        : ListView.separated(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: displayedCustomers.length,
+                            separatorBuilder: (_, __) => const Divider(height: 1, color: StationColors.divider),
+                            itemBuilder: (context, i) {
+                              final c = displayedCustomers[i];
+                              bool isSelected = i == _selectedCustomerIdx;
 
-                    return InkWell(
-                      onTap: () => setState(() => _selectedCustomerIdx = i),
-                      child: Container(
-                        color: isSelected ? StationColors.primaryLight.withOpacity(0.08) : Colors.transparent,
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    c.name,
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: StationColors.textDark),
+                              return InkWell(
+                                onTap: () => setState(() => _selectedCustomerIdx = i),
+                                child: Container(
+                                  color: isSelected ? StationColors.primaryLight.withOpacity(0.08) : Colors.transparent,
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              c.name,
+                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: StationColors.textDark),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              c.subtitle,
+                                              style: const TextStyle(fontSize: 13, color: StationColors.textLight),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      Text(
+                                        c.formattedPending,
+                                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: StationColors.accentOrange),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      const Icon(Icons.chevron_right, size: 20, color: Colors.grey),
+                                    ],
                                   ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    c.subtitle,
-                                    style: const TextStyle(fontSize: 13, color: StationColors.textLight),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Text(
-                              c.formattedPending,
-                              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: StationColors.accentOrange),
-                            ),
-                            const SizedBox(width: 6),
-                            const Icon(Icons.chevron_right, size: 20, color: Colors.grey),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+                  const SizedBox(height: 12),
+                  PaginationControl(
+                    currentPage: _currentPage,
+                    totalItems: totalItems,
+                    pageSize: _pageSize,
+                    onPageChanged: (newPage) {
+                      setState(() {
+                        _currentPage = newPage;
+                        _selectedCustomerIdx = 0;
+                      });
+                    },
+                  ),
+                ],
               );
 
-              Widget detailCard = Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(StationDimensions.cardRadius),
-                  border: Border.all(color: StationColors.divider),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      customer.name,
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: StationColors.textDark),
-                    ),
-                    Text(customer.subtitle, style: const TextStyle(fontSize: 13, color: StationColors.textMedium)),
-                    const SizedBox(height: 14),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('Credit given: 9 Oct 2026', style: TextStyle(fontSize: 13, color: StationColors.textLight)),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            const Text('Pending amount', style: TextStyle(fontSize: 11, color: StationColors.textLight)),
-                            Text(
-                              customer.formattedPending,
-                              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: StationColors.accentOrange),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                    const Divider(height: 24),
-
-                    // Payment History
-                    const Text('Payment history', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                    const SizedBox(height: 8),
-                    Container(
+              Widget detailCard = customer == null
+                  ? const SizedBox()
+                  : Container(
+                      padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(StationDimensions.cardRadius),
                         border: Border.all(color: StationColors.divider),
-                        borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Table(
-                        children: const [
-                          TableRow(
-                            decoration: BoxDecoration(color: Color(0xFFF7F9F9)),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Padding(padding: EdgeInsets.all(8), child: Text('Date', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
-                              Padding(padding: EdgeInsets.all(8), child: Text('Amount', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
-                              Padding(padding: EdgeInsets.all(8), child: Text('Mode', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
-                              Padding(padding: EdgeInsets.all(8), child: Text('Note', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(customer.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20, color: StationColors.textDark)),
+                                  Text(customer.subtitle, style: const TextStyle(fontSize: 13, color: StationColors.textMedium)),
+                                ],
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: StationColors.accentOrangeLight,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  customer.formattedPending,
+                                  style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: StationColors.accentOrange),
+                                ),
+                              ),
                             ],
                           ),
-                          TableRow(
+                          const Divider(height: 28),
+
+                          // Customer Activity Timeline
+                          const Text('Recent Khata payments', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                          const SizedBox(height: 12),
+                          if (customer.payments.isEmpty)
+                            const Padding(
+                              padding: EdgeInsets.only(bottom: 10),
+                              child: Text('No previous payments recorded.', style: TextStyle(fontSize: 13, color: StationColors.textLight)),
+                            )
+                          else
+                            ...customer.payments.map((p) {
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 10),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      '${p.date.day}/${p.date.month} • Paid via ${p.mode}${p.note != null ? ' (${p.note})' : ''}',
+                                      style: const TextStyle(fontSize: 13, color: StationColors.textMedium),
+                                    ),
+                                    Text(
+                                      p.formattedAmount,
+                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: StationColors.successGreen),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }),
+                          const Divider(height: 28),
+
+                          // Record Khata Payment Section
+                          const Text('Record Khata payment', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                          const SizedBox(height: 12),
+                          Row(
                             children: [
-                              Padding(padding: EdgeInsets.all(8), child: Text('09 Oct 2026', style: TextStyle(fontSize: 12))),
-                              Padding(padding: EdgeInsets.all(8), child: Text('₹0', style: TextStyle(fontSize: 12))),
-                              Padding(padding: EdgeInsets.all(8), child: Text('—', style: TextStyle(fontSize: 12))),
-                              Padding(padding: EdgeInsets.all(8), child: Text('Credit given', style: TextStyle(fontSize: 12))),
+                              Expanded(
+                                flex: 3,
+                                child: TextField(
+                                  controller: _paymentAmountController,
+                                  keyboardType: TextInputType.number,
+                                  decoration: InputDecoration(
+                                    labelText: 'Payment amount',
+                                    prefixText: '₹ ',
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                flex: 2,
+                                child: DropdownButtonFormField<String>(
+                                  value: _paymentMode,
+                                  decoration: InputDecoration(
+                                    labelText: 'Mode',
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                  ),
+                                  items: const [
+                                    DropdownMenuItem(value: 'Cash', child: Text('Cash')),
+                                    DropdownMenuItem(value: 'PhonePe', child: Text('PhonePe')),
+                                    DropdownMenuItem(value: 'Bank', child: Text('Bank Transfer')),
+                                  ],
+                                  onChanged: (val) {
+                                    if (val != null) setState(() => _paymentMode = val);
+                                  },
+                                ),
+                              ),
                             ],
+                          ),
+                          const SizedBox(height: 16),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 46,
+                            child: ElevatedButton.icon(
+                              icon: const Icon(Icons.check_circle_outline, size: 18, color: Colors.white),
+                              label: const Text('Record payment received', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: StationColors.successGreen,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                              onPressed: () {
+                                int paise = CurrencyFormatter.parseToPaise(_paymentAmountController.text);
+                                if (paise <= 0) return;
+
+                                state.recordCreditPayment(customer.id, paise, _paymentMode);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Payment of ${CurrencyFormatter.formatPaise(paise)} recorded for ${customer.name}.'),
+                                    backgroundColor: StationColors.successGreen,
+                                  ),
+                                );
+                              },
+                            ),
                           ),
                         ],
                       ),
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Record Payment Section
-                    const Text('Record payment', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                    const SizedBox(height: 2),
-                    const Text('This reduces credit; it is not a new fuel sale.', style: TextStyle(fontSize: 12, color: StationColors.textLight)),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          flex: 3,
-                          child: TextField(
-                            controller: _paymentAmountController,
-                            keyboardType: TextInputType.number,
-                            decoration: InputDecoration(
-                              prefixText: '₹ ',
-                              labelText: 'Amount',
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          flex: 4,
-                          child: Row(
-                            children: [
-                              Radio<String>(
-                                value: 'Cash',
-                                groupValue: _paymentMode,
-                                onChanged: (val) => setState(() => _paymentMode = val!),
-                              ),
-                              const Text('Cash', style: TextStyle(fontSize: 13)),
-                              Radio<String>(
-                                value: 'PhonePe',
-                                groupValue: _paymentMode,
-                                onChanged: (val) => setState(() => _paymentMode = val!),
-                              ),
-                              const Text('PhonePe', style: TextStyle(fontSize: 13)),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 48,
-                      child: ElevatedButton.icon(
-                        icon: const Icon(Icons.currency_rupee, size: 18, color: Colors.white),
-                        label: const Text('Record payment', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: StationColors.primary,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        ),
-                        onPressed: () {
-                          int paise = CurrencyFormatter.parseToPaise(_paymentAmountController.text);
-                          if (paise <= 0) return;
-
-                          state.recordCreditPayment(customer.id, paise, _paymentMode);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Payment of ${CurrencyFormatter.formatPaise(paise)} recorded for ${customer.name}.'),
-                              backgroundColor: StationColors.successGreen,
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              );
+                    );
 
               if (!isWide) {
                 return Column(

@@ -29,9 +29,12 @@ enum UserRole {
 class UserProfile {
   final String id;
   final String name;
+  final String email;
   final String phoneNumber;
   final UserRole role;
-  final String assignedShift; // e.g. "Morning", "Evening", "Night", "All"
+  final String? assignedShift; // "Morning", "Evening", "Night" (null for owner)
+  final String village;
+  final String address;
   final String preferredLanguage; // "te" or "en"
   final bool active;
   final List<String> permissions;
@@ -39,9 +42,12 @@ class UserProfile {
   const UserProfile({
     required this.id,
     required this.name,
+    this.email = '',
     required this.phoneNumber,
     required this.role,
-    this.assignedShift = 'Morning',
+    this.assignedShift,
+    this.village = 'Chatrai',
+    this.address = 'Chatrai, Andhra Pradesh',
     this.preferredLanguage = 'te',
     this.active = true,
     this.permissions = const [],
@@ -50,9 +56,12 @@ class UserProfile {
   UserProfile copyWith({
     String? id,
     String? name,
+    String? email,
     String? phoneNumber,
     UserRole? role,
     String? assignedShift,
+    String? village,
+    String? address,
     String? preferredLanguage,
     bool? active,
     List<String>? permissions,
@@ -60,9 +69,12 @@ class UserProfile {
     return UserProfile(
       id: id ?? this.id,
       name: name ?? this.name,
+      email: email ?? this.email,
       phoneNumber: phoneNumber ?? this.phoneNumber,
       role: role ?? this.role,
       assignedShift: assignedShift ?? this.assignedShift,
+      village: village ?? this.village,
+      address: address ?? this.address,
       preferredLanguage: preferredLanguage ?? this.preferredLanguage,
       active: active ?? this.active,
       permissions: permissions ?? this.permissions,
@@ -73,9 +85,12 @@ class UserProfile {
     return {
       'id': id,
       'name': name,
+      'email': email,
       'phoneNumber': phoneNumber,
       'role': role.name,
       'assignedShift': assignedShift,
+      'village': village,
+      'address': address,
       'preferredLanguage': preferredLanguage,
       'active': active,
       'permissions': permissions,
@@ -86,12 +101,15 @@ class UserProfile {
     return UserProfile(
       id: map['id'] ?? '',
       name: map['name'] ?? '',
+      email: map['email'] ?? '',
       phoneNumber: map['phoneNumber'] ?? '',
       role: UserRole.values.firstWhere(
         (r) => r.name == map['role'],
         orElse: () => UserRole.shiftStaff,
       ),
-      assignedShift: map['assignedShift'] ?? 'Morning',
+      assignedShift: map['assignedShift'],
+      village: map['village'] ?? 'Chatrai',
+      address: map['address'] ?? 'Chatrai, Andhra Pradesh',
       preferredLanguage: map['preferredLanguage'] ?? 'te',
       active: map['active'] ?? true,
       permissions: List<String>.from(map['permissions'] ?? []),

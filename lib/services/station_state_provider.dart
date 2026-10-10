@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/user_profile.dart';
 import '../models/pump.dart';
 import '../models/shift.dart';
@@ -31,9 +32,10 @@ class StationStateProvider extends ChangeNotifier {
   String _currentLanguage = 'en';
   String get currentLanguage => _currentLanguage;
 
-  // Active Logged-in User
-  late UserProfile _currentUser;
-  UserProfile get currentUser => _currentUser;
+  // Active Authenticated User (null if logged out)
+  UserProfile? _currentUser;
+  UserProfile get currentUser => _currentUser ?? _allUsers.first;
+  bool get isAuthenticated => _currentUser != null;
 
   // Station Settings
   StationSettings _settings = const StationSettings();
@@ -43,17 +45,13 @@ class StationStateProvider extends ChangeNotifier {
   bool _simulateInsideGeofence = true;
   bool get simulateInsideGeofence => _simulateInsideGeofence;
 
-  // All Available Station Users
+  // Station Members (Kalyan and Ranjit as authoritative owners)
   List<UserProfile> _allUsers = [];
   List<UserProfile> get allUsers => _allUsers;
 
   // Pumps & Dispensers
   List<Pump> _pumps = [];
   List<Pump> get pumps => _pumps;
-
-  // Current Active Shift
-  late Shift _activeShift;
-  Shift get activeShift => _activeShift;
 
   // Shifts History
   List<Shift> _allShifts = [];
@@ -62,6 +60,26 @@ class StationStateProvider extends ChangeNotifier {
   // Transaction Entries
   List<TransactionEntry> _entries = [];
   List<TransactionEntry> get entries => _entries;
+
+  // Filtered Entries for Authenticated User (Zero-trust isolation)
+  List<TransactionEntry> get userEntries {
+    if (_currentUser == null) return [];
+    if (_currentUser!.role == UserRole.owner || _currentUser!.role == UserRole.manager) {
+      return _entries;
+    }
+    return _entries.where((e) => e.createdBy == _currentUser!.name || e.shiftId == activeShift.id).toList();
+  }
+
+  // Active Shift for Current User
+  Shift get activeShift {
+    if (_currentUser != null && _currentUser!.assignedShift != null) {
+      return _allShifts.firstWhere(
+        (s) => s.shiftName.toLowerCase() == _currentUser!.assignedShift!.toLowerCase(),
+        orElse: () => _allShifts.first,
+      );
+    }
+    return _allShifts.first;
+  }
 
   // Receipts Inbox
   List<ReceiptScan> _receipts = [];
@@ -75,52 +93,123 @@ class StationStateProvider extends ChangeNotifier {
   List<OwnerNotificationItem> _notifications = [];
   List<OwnerNotificationItem> get notifications => _notifications;
 
+  // Cloud Firestore handle
+  FirebaseFirestore? _firestore;
+
   StationStateProvider() {
     _initializeDefaultData();
+    _initFirestore();
+  }
+
+  void _initFirestore() {
+    try {
+      _firestore = FirebaseFirestore.instance;
+      _listenToRemoteMembers();
+      _listenToRemoteEntries();
+      _listenToRemoteReceipts();
+    } catch (e) {
+      debugPrint('Firestore offline fallback active: $e');
+    }
+  }
+
+  void _listenToRemoteMembers() {
+    if (_firestore == null) return;
+    try {
+      _firestore!.collection('stations').doc('chatrai').collection('members').snapshots().listen((snapshot) {
+        if (snapshot.docs.isNotEmpty) {
+          List<UserProfile> remoteUsers = snapshot.docs.map((doc) {
+            Map<String, dynamic> data = doc.data();
+            data['id'] = doc.id;
+            return UserProfile.fromMap(data);
+          }).toList();
+
+          _allUsers = remoteUsers;
+          if (_currentUser != null) {
+            _currentUser = _allUsers.firstWhere((u) => u.id == _currentUser!.id, orElse: () => _currentUser!);
+          }
+          notifyListeners();
+        }
+      });
+    } catch (_) {}
+  }
+
+  void _listenToRemoteEntries() {
+    if (_firestore == null) return;
+    try {
+      _firestore!.collection('stations').doc('chatrai').collection('entries').snapshots().listen((snapshot) {
+        if (snapshot.docs.isNotEmpty) {
+          _entries = snapshot.docs.map((doc) => TransactionEntry.fromMap(doc.data())).toList();
+          notifyListeners();
+        }
+      });
+    } catch (_) {}
+  }
+
+  void _listenToRemoteReceipts() {
+    if (_firestore == null) return;
+    try {
+      _firestore!.collection('stations').doc('chatrai').collection('scanAttempts').snapshots().listen((snapshot) {
+        if (snapshot.docs.isNotEmpty) {
+          _receipts = snapshot.docs.map((doc) => ReceiptScan.fromMap(doc.data())).toList();
+          notifyListeners();
+        }
+      });
+    } catch (_) {}
   }
 
   void _initializeDefaultData() {
-    // 1. Users
+    // 1. Authoritative Owners & Staff (Kalyan & Ranjit, junk removed)
     _allUsers = [
       const UserProfile(
-        id: 'owner_abhilash',
-        name: 'Abhilash',
-        phoneNumber: '+91 98480 12345',
+        id: 'owner_kalyan',
+        name: 'Kalyan',
+        email: 'kalyan@rfs.com',
+        phoneNumber: '+91 98480 11111',
         role: UserRole.owner,
-        assignedShift: 'All',
+        assignedShift: null, // Owners have no shift
+        village: 'Chatrai',
+        address: 'Main Road, Chatrai',
         preferredLanguage: 'en',
       ),
       const UserProfile(
-        id: 'mgr_ravi',
-        name: 'Ravi',
-        phoneNumber: '+91 94401 23456',
-        role: UserRole.manager,
-        assignedShift: 'Station 1',
-        preferredLanguage: 'te',
+        id: 'owner_ranjit',
+        name: 'Ranjit',
+        email: 'ranjit@rfs.com',
+        phoneNumber: '+91 98480 22222',
+        role: UserRole.owner,
+        assignedShift: null, // Owners have no shift
+        village: 'Chatrai',
+        address: 'Bypass Road, Chatrai',
+        preferredLanguage: 'en',
       ),
       const UserProfile(
-        id: 'staff_srikant',
-        name: 'Srikant',
+        id: 'staff_srikanth',
+        name: 'Srikanth',
+        email: 'srikanth@rfs.com',
         phoneNumber: '+91 98492 34567',
         role: UserRole.shiftStaff,
-        assignedShift: 'Evening',
+        assignedShift: 'Morning',
+        village: 'Chatrai',
+        address: 'Gandhi Nagar, Chatrai',
         preferredLanguage: 'te',
       ),
       const UserProfile(
         id: 'staff_kishore',
         name: 'Kishore',
+        email: 'kishore@rfs.com',
         phoneNumber: '+91 97013 45678',
         role: UserRole.shiftStaff,
-        assignedShift: 'Night',
+        assignedShift: 'Evening',
+        village: 'Chatrai',
+        address: 'Station Road, Chatrai',
         preferredLanguage: 'te',
       ),
     ];
 
-    // Default current user is Staff Ravi / Srikant for forecourt view
-    _currentUser = _allUsers[1]; // Ravi
+    // Mandatory login gate: starts unauthenticated
+    _currentUser = null;
 
     // 2. Pumps & Dispensers
-    // Pump 1: Serial 202501001272
     _pumps = [
       Pump(
         id: 'pump_1',
@@ -134,8 +223,8 @@ class StationStateProvider extends ChangeNotifier {
             nozzleNumber: 1,
             fuelType: 'Petrol',
             ratePaisePerLitre: 11752, // ₹117.52
-            currentTotaliserMl: 169923720, // 169,923.720 L
-            previousAcceptedReadingMl: 168676720, // 168,676.720 L
+            currentTotaliserMl: 169923720,
+            previousAcceptedReadingMl: 168676720,
             previousReadingTimestamp: DateTime(2026, 10, 9, 21, 50),
           ),
           Nozzle(
@@ -144,8 +233,8 @@ class StationStateProvider extends ChangeNotifier {
             nozzleNumber: 2,
             fuelType: 'Diesel',
             ratePaisePerLitre: 10521, // ₹105.21
-            currentTotaliserMl: 274487190, // 274,487.190 L
-            previousAcceptedReadingMl: 273287210, // 273,287.210 L
+            currentTotaliserMl: 274487190,
+            previousAcceptedReadingMl: 273287210,
             previousReadingTimestamp: DateTime(2026, 10, 9, 21, 50),
           ),
         ],
@@ -177,205 +266,146 @@ class StationStateProvider extends ChangeNotifier {
       ),
     ];
 
-    // 3. Active Shift (Morning 10 Oct 2026)
-    _activeShift = Shift(
-      id: 'shift_10oct_morning',
-      shiftName: 'Morning',
-      businessDate: '10 Oct 2026',
-      staffId: 'mgr_ravi',
-      staffName: 'Ravi',
-      pumpName: 'Pump 1',
-      status: ShiftStatus.inProgress,
-      timeRange: '6:00 AM - 2:00 PM',
-      openingReadingsMl: {
-        1: 169923720,
-        2: 274487190,
-      },
-      closingReadingsMl: {
-        1: 170218850,
-        2: 275095980,
-      },
-      testVolumesMl: {
-        1: 5000,
-        2: 5000,
-      },
-      cashHandoverPaise: 1307400, // ₹13,074
-    );
-
-    // 4. Historical Shifts for Review
+    // 3. Operational Shifts
     _allShifts = [
-      _activeShift,
-      Shift(
-        id: 'shift_9oct_evening',
-        shiftName: 'Evening',
-        businessDate: '9 Oct 2026',
-        staffId: 'staff_srikant',
-        staffName: 'Srikant',
+      const Shift(
+        id: 'shift_morning',
+        shiftName: 'Morning',
+        businessDate: '10 Oct 2026',
+        staffId: 'staff_srikanth',
+        staffName: 'Srikanth',
         pumpName: 'Pump 1',
-        status: ShiftStatus.needsReview,
-        timeRange: '2:00 PM - 10:00 PM',
-        openingReadingsMl: {
-          1: 168676720,
-          2: 273287210,
-        },
-        closingReadingsMl: {
-          1: 168971850,
-          2: 273901000,
-        },
-        testVolumesMl: {
-          1: 5000,
-          2: 5000,
-        },
+        status: ShiftStatus.inProgress,
+        timeRange: '6:00 AM - 2:00 PM',
+        openingReadingsMl: {1: 169923720, 2: 274487190},
+        closingReadingsMl: {1: 170218850, 2: 275095980},
+        testVolumesMl: {1: 5000, 2: 5000},
         cashHandoverPaise: 1307400,
-        handoverReceiver: 'Owner',
-        handoverTime: DateTime(2026, 10, 9, 22, 0),
-        note: 'Category mapping pending.',
       ),
-      Shift(
-        id: 'shift_9oct_night',
-        shiftName: 'Night',
+      const Shift(
+        id: 'shift_evening',
+        shiftName: 'Evening',
         businessDate: '9 Oct 2026',
         staffId: 'staff_kishore',
         staffName: 'Kishore',
-        pumpName: 'Pump 2',
+        pumpName: 'Pump 1',
         status: ShiftStatus.needsReview,
-        timeRange: '10:00 PM - 6:00 AM',
-        openingReadingsMl: {
-          1: 84120000,
-          2: 134800000,
-        },
-        closingReadingsMl: {
-          1: 84520100,
-          2: 135400200,
-        },
-        testVolumesMl: {
-          1: 5000,
-          2: 5000,
-        },
-        cashHandoverPaise: 3058000,
-        handoverReceiver: 'Owner',
-        handoverTime: DateTime(2026, 10, 10, 6, 0),
-        note: 'Night shift closing.',
+        timeRange: '2:00 PM - 10:00 PM',
+        openingReadingsMl: {1: 168676720, 2: 273287210},
+        closingReadingsMl: {1: 168971850, 2: 273901000},
+        testVolumesMl: {1: 5000, 2: 5000},
+        cashHandoverPaise: 1307400,
       ),
     ];
 
-    // 5. Money Entries from Golden Ledger Fixture
+    // 4. Initial Entries
     _entries = [
       TransactionEntry(
         id: 'entry_1',
-        shiftId: 'shift_9oct_evening',
+        shiftId: 'shift_evening',
         category: EntryCategory.phonePe,
         direction: EntryDirection.received,
-        amountPaise: 250000, // ₹2,500
+        amountPaise: 250000,
         phonePeNumber: '9848012432',
         timeString: '12:15 pm',
         reference: 'Customer UPI',
         createdAt: DateTime(2026, 10, 9, 12, 15),
-        createdBy: 'Srikant',
+        createdBy: 'Srikanth',
       ),
       TransactionEntry(
         id: 'entry_2',
-        shiftId: 'shift_9oct_evening',
+        shiftId: 'shift_evening',
         category: EntryCategory.phonePe,
         direction: EntryDirection.received,
-        amountPaise: 3056700, // ₹30,567 (Total PhonePe = ₹33,067)
+        amountPaise: 3056700,
         phonePeNumber: '9440198765',
         timeString: '7:40 pm',
         reference: 'Forecourt QR scans',
         createdAt: DateTime(2026, 10, 9, 19, 40),
-        createdBy: 'Srikant',
+        createdBy: 'Srikanth',
       ),
       TransactionEntry(
         id: 'entry_3',
-        shiftId: 'shift_9oct_evening',
+        shiftId: 'shift_evening',
         category: EntryCategory.card,
         direction: EntryDirection.received,
-        amountPaise: 453200, // ₹4,532 (swiping)
+        amountPaise: 453200,
         reference: 'HDFC POS swipe',
         createdAt: DateTime(2026, 10, 9, 18, 20),
-        createdBy: 'Srikant',
+        createdBy: 'Srikanth',
       ),
       TransactionEntry(
         id: 'entry_4',
-        shiftId: 'shift_9oct_evening',
+        shiftId: 'shift_evening',
         category: EntryCategory.credit,
         direction: EntryDirection.received,
-        amountPaise: 1800000, // ₹18,000 (Sri Sai Travels)
+        amountPaise: 1800000,
         reference: 'Sri Sai Travels (Bus AP16 XX1234)',
         createdAt: DateTime(2026, 10, 9, 16, 0),
-        createdBy: 'Srikant',
+        createdBy: 'Srikanth',
       ),
       TransactionEntry(
         id: 'entry_5',
-        shiftId: 'shift_9oct_evening',
+        shiftId: 'shift_evening',
         category: EntryCategory.credit,
         direction: EntryDirection.received,
-        amountPaise: 1200000, // ₹12,000 (Local school bus)
+        amountPaise: 1200000,
         reference: 'Local school bus (N.C)',
         createdAt: DateTime(2026, 10, 9, 17, 30),
-        createdBy: 'Srikant',
+        createdBy: 'Srikanth',
       ),
       TransactionEntry(
         id: 'entry_6',
-        shiftId: 'shift_9oct_evening',
+        shiftId: 'shift_evening',
         category: EntryCategory.expense,
         direction: EntryDirection.paidOut,
-        amountPaise: 1737300, // ₹17,373 (Bus Bill / Other cash debit)
-        reference: 'Other cash debit (Needs owner category)',
+        amountPaise: 1737300,
+        reference: 'Other cash debit',
         createdAt: DateTime(2026, 10, 9, 19, 0),
-        createdBy: 'Srikant',
+        createdBy: 'Srikanth',
       ),
       TransactionEntry(
         id: 'entry_7',
-        shiftId: 'shift_9oct_evening',
+        shiftId: 'shift_evening',
         category: EntryCategory.expense,
         direction: EntryDirection.paidOut,
-        amountPaise: 10000, // ₹100 (Food expense / curries)
+        amountPaise: 10000,
         reference: 'Food / curries',
         createdAt: DateTime(2026, 10, 9, 13, 30),
-        createdBy: 'Srikant',
+        createdBy: 'Srikanth',
       ),
       TransactionEntry(
         id: 'entry_8',
-        shiftId: 'shift_9oct_evening',
+        shiftId: 'shift_evening',
         category: EntryCategory.toOwner,
         direction: EntryDirection.paidOut,
-        amountPaise: 1307400, // ₹13,074
+        amountPaise: 1307400,
         reference: 'Cash given owner',
         timeString: '10:00 pm',
         createdAt: DateTime(2026, 10, 9, 22, 0),
-        createdBy: 'Srikant',
+        createdBy: 'Srikanth',
       ),
     ];
 
-    // 6. Credit Customers Khata
+    // 5. Credit Customers
     _creditCustomers = [
       CreditCustomer(
         id: 'cust_srisai',
         name: 'Sri Sai Travels',
         subtitle: 'Bus AP16 XX1234',
-        pendingAmountPaise: 1800000, // ₹18,000
+        pendingAmountPaise: 1800000,
         lastCreditDate: DateTime(2026, 10, 9),
-        payments: [
-          CreditPayment(
-            id: 'pay_1',
-            date: DateTime(2026, 10, 8),
-            amountPaise: 500000,
-            mode: 'Cash',
-            note: 'Advance payment',
-          ),
-        ],
       ),
       CreditCustomer(
         id: 'cust_schoolbus',
         name: 'Local school bus',
         subtitle: 'School Transport',
-        pendingAmountPaise: 1200000, // ₹12,000
+        pendingAmountPaise: 1200000,
         lastCreditDate: DateTime(2026, 10, 9),
       ),
     ];
 
-    // 7. Receipts Inbox
+    // 6. Receipts
     _receipts = [
       ReceiptScan(
         id: 'scan_sample_9oct',
@@ -383,58 +413,22 @@ class StationStateProvider extends ChangeNotifier {
         fpId: '1',
         printedDate: '09/10/2026',
         printedTime: '21:50:29',
-        nozzleCumVolumeMl: {
-          1: 169923720,
-          2: 274487190,
-        },
+        nozzleCumVolumeMl: {1: 169923720, 2: 274487190},
         imagePath: 'assets/images/media_1791616403909.jpg',
         validationStatus: ReceiptValidationStatus.previousDayReceipt,
         statusMessage: 'This receipt is from 9 Oct 2026. Take today\'s printout.',
-        capturedBy: 'Ravi (sample)',
+        capturedBy: 'Srikanth',
         capturedAt: DateTime(2026, 10, 9, 21, 51),
-        locationVerified: false,
-        distanceMeters: 18.5,
-      ),
-      ReceiptScan(
-        id: 'scan_sample_srikant',
-        pumpSerialNumber: '202501001272',
-        fpId: '1',
-        printedDate: '10/10/2026',
-        printedTime: '06:45:10',
-        nozzleCumVolumeMl: {
-          1: 170218850,
-          2: 275095980,
-        },
-        imagePath: 'assets/images/media_1791616403909.jpg',
-        validationStatus: ReceiptValidationStatus.valid,
-        statusMessage: 'Verified today reading.',
-        capturedBy: 'Srikant (sample)',
-        capturedAt: DateTime(2026, 10, 10, 6, 46),
-        locationVerified: true,
-        distanceMeters: 12.0,
       ),
     ];
 
-    // 8. Notifications
+    // 7. Notifications
     _notifications = [
       OwnerNotificationItem(
         id: 'notif_1',
-        title: 'New receipt scan from Srikant',
-        subtitle: 'Pump 1 • 10 Oct 2026 06:45 • Verified',
+        title: 'New receipt scan from Srikanth',
+        subtitle: 'Pump 1 • 10 Oct 2026 • Verified',
         timestamp: DateTime(2026, 10, 10, 6, 46),
-      ),
-      OwnerNotificationItem(
-        id: 'notif_2',
-        title: 'Previous-day receipt uploaded',
-        subtitle: 'Ravi scanned 9 Oct receipt for 10 Oct shift • Flagged',
-        timestamp: DateTime(2026, 10, 9, 21, 51),
-        isWarning: true,
-      ),
-      OwnerNotificationItem(
-        id: 'notif_3',
-        title: 'Evening shift cash handover ready',
-        subtitle: '₹13,074 handed over to Owner by Srikant',
-        timestamp: DateTime(2026, 10, 9, 22, 5),
       ),
     ];
   }
@@ -451,6 +445,11 @@ class StationStateProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  void logout() {
+    _currentUser = null;
+    notifyListeners();
+  }
+
   void toggleGeofenceSimulation() {
     _simulateInsideGeofence = !_simulateInsideGeofence;
     notifyListeners();
@@ -458,33 +457,34 @@ class StationStateProvider extends ChangeNotifier {
 
   void addTransactionEntry(TransactionEntry entry) {
     _entries.insert(0, entry);
+    // Sync to Firestore if online
+    if (_firestore != null) {
+      try {
+        _firestore!.collection('stations').doc('chatrai').collection('entries').doc(entry.id).set(entry.toMap());
+      } catch (_) {}
+    }
     notifyListeners();
   }
 
   void saveReceiptScan(ReceiptScan scan) {
     _receipts.insert(0, scan);
-    
-    // Create Owner Notification
-    _notifications.insert(
-      0,
-      OwnerNotificationItem(
-        id: 'notif_${DateTime.now().millisecondsSinceEpoch}',
-        title: 'New scan uploaded: ${scan.pumpSerialNumber}',
-        subtitle: scan.statusMessage,
-        timestamp: DateTime.now(),
-        isWarning: scan.validationStatus != ReceiptValidationStatus.valid,
-      ),
-    );
-
+    if (_firestore != null) {
+      try {
+        _firestore!.collection('stations').doc('chatrai').collection('scanAttempts').doc(scan.id).set(scan.toMap());
+      } catch (_) {}
+    }
     notifyListeners();
   }
 
   void submitShiftForReview(int cashHandoverPaise) {
-    _activeShift = _activeShift.copyWith(
-      status: ShiftStatus.needsReview,
-      cashHandoverPaise: cashHandoverPaise,
-      handoverTime: DateTime.now(),
-    );
+    int idx = _allShifts.indexWhere((s) => s.id == activeShift.id);
+    if (idx != -1) {
+      _allShifts[idx] = _allShifts[idx].copyWith(
+        status: ShiftStatus.needsReview,
+        cashHandoverPaise: cashHandoverPaise,
+        handoverTime: DateTime.now(),
+      );
+    }
     notifyListeners();
   }
 
@@ -493,19 +493,7 @@ class StationStateProvider extends ChangeNotifier {
     if (idx != -1) {
       CreditCustomer cust = _creditCustomers[idx];
       int updatedPending = (cust.pendingAmountPaise - amountPaise).clamp(0, double.infinity).toInt();
-      List<CreditPayment> updatedPayments = List.from(cust.payments)..insert(
-        0,
-        CreditPayment(
-          id: 'pay_${DateTime.now().millisecondsSinceEpoch}',
-          date: DateTime.now(),
-          amountPaise: amountPaise,
-          mode: mode,
-        ),
-      );
-      _creditCustomers[idx] = cust.copyWith(
-        pendingAmountPaise: updatedPending,
-        payments: updatedPayments,
-      );
+      _creditCustomers[idx] = cust.copyWith(pendingAmountPaise: updatedPending);
       notifyListeners();
     }
   }
@@ -517,20 +505,41 @@ class StationStateProvider extends ChangeNotifier {
 
   void addNewUser(UserProfile newUser) {
     _allUsers.add(newUser);
+    if (_firestore != null) {
+      try {
+        _firestore!.collection('stations').doc('chatrai').collection('members').doc(newUser.id).set(newUser.toMap());
+      } catch (_) {}
+    }
     notifyListeners();
   }
 
-  void toggleUserSuspension(String userId) {
-    int idx = _allUsers.indexWhere((u) => u.id == userId);
+  void updateUser(UserProfile updatedUser) {
+    int idx = _allUsers.indexWhere((u) => u.id == updatedUser.id);
     if (idx != -1) {
-      _allUsers[idx] = _allUsers[idx].copyWith(active: !_allUsers[idx].active);
+      _allUsers[idx] = updatedUser;
+      if (_currentUser?.id == updatedUser.id) {
+        _currentUser = updatedUser;
+      }
+      if (_firestore != null) {
+        try {
+          _firestore!.collection('stations').doc('chatrai').collection('members').doc(updatedUser.id).set(updatedUser.toMap());
+        } catch (_) {}
+      }
       notifyListeners();
     }
   }
 
-  /// Calculates authoritative reconciliation report for the 9 Oct sample shift
+  void deleteUser(String userId) {
+    _allUsers.removeWhere((u) => u.id == userId);
+    if (_firestore != null) {
+      try {
+        _firestore!.collection('stations').doc('chatrai').collection('members').doc(userId).delete();
+      } catch (_) {}
+    }
+    notifyListeners();
+  }
+
   ShiftReconciliationReport get sampleShiftReport {
-    // Petrol (Pump 1 Nozzle 1)
     NozzleCalculationResult petrol = ReconciliationService.calculateNozzle(
       nozzleNumber: 1,
       fuelType: 'Petrol',
@@ -540,7 +549,6 @@ class StationStateProvider extends ChangeNotifier {
       ratePaisePerLitre: 11752,
     );
 
-    // Diesel (Pump 1 Nozzle 2)
     NozzleCalculationResult diesel = ReconciliationService.calculateNozzle(
       nozzleNumber: 2,
       fuelType: 'Diesel',
@@ -552,15 +560,15 @@ class StationStateProvider extends ChangeNotifier {
 
     return ReconciliationService.reconcileShift(
       nozzleResults: [petrol, diesel],
-      cashSalesPaise: 3054700, // ₹30,547
-      phonePeSalesPaise: 3306700, // ₹33,067
-      cardSalesPaise: 453200, // ₹4,532
-      creditSalesPaise: 3000000, // ₹30,000
+      cashSalesPaise: 3054700,
+      phonePeSalesPaise: 3306700,
+      cardSalesPaise: 453200,
+      creditSalesPaise: 3000000,
       openingCashFloatPaise: 0,
-      otherCashDebitsPaise: 1737300, // ₹17,373
-      foodExpensesPaise: 10000, // ₹100
+      otherCashDebitsPaise: 1737300,
+      foodExpensesPaise: 10000,
       salaryExpensesPaise: 0,
-      cashGivenToOwnerPaise: 1307400, // ₹13,074
+      cashGivenToOwnerPaise: 1307400,
       countedClosingCashPaise: 0,
     );
   }

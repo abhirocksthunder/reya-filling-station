@@ -52,8 +52,6 @@ class _StationSettingsScreenState extends State<StationSettingsScreen> {
                     AppStrings.get('stationSettings', lang),
                     style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: StationColors.textDark),
                   ),
-                  const SizedBox(height: 2),
-                  const Text('Demo • UI review', style: TextStyle(fontSize: 14, color: StationColors.textMedium)),
                 ],
               ),
               ElevatedButton.icon(

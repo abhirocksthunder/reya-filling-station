@@ -9,11 +9,13 @@ import '../../services/station_state_provider.dart';
 class StationTopBar extends StatelessWidget implements PreferredSizeWidget {
   final VoidCallback? onNotificationTap;
   final bool isOwnerView;
+  final VoidCallback? onLogout;
 
   const StationTopBar({
     super.key,
     this.onNotificationTap,
     this.isOwnerView = false,
+    this.onLogout,
   });
 
   @override
@@ -23,6 +25,7 @@ class StationTopBar extends StatelessWidget implements PreferredSizeWidget {
   Widget build(BuildContext context) {
     final state = context.watch<StationStateProvider>();
     final lang = state.currentLanguage;
+    final user = state.currentUser;
 
     return AppBar(
       backgroundColor: Colors.white,
@@ -39,29 +42,18 @@ class StationTopBar extends StatelessWidget implements PreferredSizeWidget {
             ),
             child: const Icon(Icons.local_gas_station_rounded, color: StationColors.primary, size: 24),
           ),
-          const SizedBox(width: 10),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                AppStrings.get('appName', lang),
-                style: const TextStyle(
-                  color: StationColors.textDark,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: -0.3,
-                ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              AppStrings.get('appName', lang),
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: StationColors.textDark,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                letterSpacing: -0.3,
               ),
-              Text(
-                AppStrings.get('demoSampleData', lang),
-                style: const TextStyle(
-                  color: StationColors.textLight,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
+            ),
           ),
         ],
       ),
@@ -85,7 +77,7 @@ class StationTopBar extends StatelessWidget implements PreferredSizeWidget {
         ),
         const SizedBox(width: 8),
 
-        // Notifications Bell (with badge)
+        // Notifications Bell
         Stack(
           alignment: Alignment.center,
           children: [
@@ -110,11 +102,10 @@ class StationTopBar extends StatelessWidget implements PreferredSizeWidget {
           ],
         ),
 
-        // Persona / Role Switcher Menu
-        PopupMenuButton<UserProfile>(
-          tooltip: 'Switch Persona',
+        // User Profile & Logout (Strictly isolated: NO dropdown of other users!)
+        PopupMenuButton<String>(
+          tooltip: 'My Account',
           offset: const Offset(0, 50),
-          initialValue: state.currentUser,
           child: Container(
             margin: const EdgeInsets.only(right: 16, left: 4),
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -129,107 +120,66 @@ class StationTopBar extends StatelessWidget implements PreferredSizeWidget {
                   radius: 12,
                   backgroundColor: Colors.white24,
                   child: Text(
-                    state.currentUser.name[0],
+                    user.name.isNotEmpty ? user.name[0] : 'U',
                     style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
                   ),
                 ),
-                const SizedBox(width: 6),
+                const SizedBox(width: 8),
                 Text(
-                  state.currentUser.role == UserRole.owner ? 'Owner' : state.currentUser.name,
+                  user.name,
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(width: 2),
+                const SizedBox(width: 4),
                 const Icon(Icons.arrow_drop_down, color: Colors.white70, size: 18),
               ],
             ),
           ),
-          onSelected: (user) => state.switchUser(user),
           itemBuilder: (context) {
             return [
-              const PopupMenuItem<UserProfile>(
+              PopupMenuItem<String>(
                 enabled: false,
-                child: Text(
-                  'Switch Active Persona (Demo)',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.grey),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      user.name,
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: StationColors.textDark),
+                    ),
+                    Text(
+                      '${user.role.displayName}${user.assignedShift != null ? ' • ${user.assignedShift}' : ''}',
+                      style: const TextStyle(fontSize: 12, color: StationColors.primary, fontWeight: FontWeight.w600),
+                    ),
+                    if (user.email.isNotEmpty)
+                      Text(user.email, style: const TextStyle(fontSize: 11, color: StationColors.textLight)),
+                    Text(user.phoneNumber, style: const TextStyle(fontSize: 11, color: StationColors.textLight)),
+                    const Divider(),
+                  ],
                 ),
               ),
-              ...state.allUsers.map((user) {
-                bool isSelected = user.id == state.currentUser.id;
-                return PopupMenuItem<UserProfile>(
-                  value: user,
-                  child: Row(
-                    children: [
-                      Icon(
-                        user.role == UserRole.owner
-                            ? Icons.admin_panel_settings_rounded
-                            : user.role == UserRole.manager
-                                ? Icons.manage_accounts_rounded
-                                : Icons.person_rounded,
-                        size: 20,
-                        color: isSelected ? StationColors.primary : Colors.grey,
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              user.name,
-                              style: TextStyle(
-                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                                color: isSelected ? StationColors.primary : Colors.black87,
-                              ),
-                            ),
-                            Text(
-                              '${user.role.displayName} • ${user.assignedShift}',
-                              style: const TextStyle(fontSize: 11, color: Colors.grey),
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (isSelected) const Icon(Icons.check, size: 18, color: StationColors.primary),
-                    ],
-                  ),
-                );
-              }),
-              const PopupMenuDivider(),
-              // Geofence Simulation Toggle
-              PopupMenuItem<UserProfile>(
-                enabled: false,
-                child: InkWell(
-                  onTap: () {
-                    Navigator.pop(context);
-                    state.toggleGeofenceSimulation();
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: Row(
-                      children: [
-                        Icon(
-                          state.simulateInsideGeofence ? Icons.location_on : Icons.location_off,
-                          color: state.simulateInsideGeofence ? StationColors.successGreen : StationColors.errorRed,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            state.simulateInsideGeofence
-                                ? 'Simulate: Outside Geofence'
-                                : 'Simulate: Inside Geofence (150m)',
-                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+              PopupMenuItem<String>(
+                value: 'logout',
+                child: Row(
+                  children: const [
+                    Icon(Icons.logout, size: 18, color: StationColors.errorRed),
+                    SizedBox(width: 10),
+                    Text('Logout', style: TextStyle(color: StationColors.errorRed, fontWeight: FontWeight.bold)),
+                  ],
                 ),
               ),
             ];
+          },
+          onSelected: (val) {
+            if (val == 'logout') {
+              if (onLogout != null) {
+                onLogout!();
+              } else {
+                state.logout();
+              }
+            }
           },
         ),
       ],

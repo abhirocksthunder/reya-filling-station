@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'core/constants/colors.dart';
 import 'models/user_profile.dart';
 import 'services/station_state_provider.dart';
+import 'ui/auth/login_screen.dart';
 import 'ui/staff/staff_shell.dart';
 import 'ui/owner/owner_shell.dart';
 
@@ -43,76 +44,28 @@ class ReyaFillingStationApp extends StatelessWidget {
   }
 }
 
-class MainPortalHost extends StatefulWidget {
+class MainPortalHost extends StatelessWidget {
   const MainPortalHost({super.key});
-
-  @override
-  State<MainPortalHost> createState() => _MainPortalHostState();
-}
-
-class _MainPortalHostState extends State<MainPortalHost> {
-  // Mode override for review: allows reviewer to switch views regardless of selected user role
-  bool? _forceOwnerView;
 
   @override
   Widget build(BuildContext context) {
     final state = context.watch<StationStateProvider>();
+
+    // Zero-Trust Auth Gate: Unauthenticated users MUST log in
+    if (!state.isAuthenticated) {
+      return LoginScreen(
+        onLoginSuccess: (user) {
+          // Auth state update triggers re-render automatically
+        },
+      );
+    }
+
+    // Role-based portal routing: Owner sees OwnerShell, Staff sees StaffShell
     final isOwnerRole = state.currentUser.role == UserRole.owner;
-
-    bool showOwner = _forceOwnerView ?? isOwnerRole;
-
-    return Stack(
-      children: [
-        if (showOwner)
-          OwnerShell(
-            onSwitchToStaffView: () => setState(() => _forceOwnerView = false),
-          )
-        else
-          StaffShell(
-            onSwitchToOwnerPortal: () => setState(() => _forceOwnerView = true),
-          ),
-
-        // Floating Quick Toggle Badge (Reviewer Switcher)
-        Positioned(
-          bottom: 16,
-          right: 16,
-          child: Material(
-            elevation: 4,
-            borderRadius: BorderRadius.circular(20),
-            color: StationColors.primaryDark,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(20),
-              onTap: () {
-                setState(() {
-                  _forceOwnerView = !showOwner;
-                });
-              },
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      showOwner ? Icons.phone_android : Icons.laptop_mac,
-                      color: StationColors.accentOrangeBorder,
-                      size: 16,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      showOwner ? 'Forecourt Phone View' : 'Owner Operations Portal',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
+    if (isOwnerRole) {
+      return const OwnerShell();
+    } else {
+      return const StaffShell();
+    }
   }
 }

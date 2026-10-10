@@ -5,6 +5,8 @@ import '../../core/constants/dimensions.dart';
 import '../../l10n/app_strings.dart';
 import '../../models/user_profile.dart';
 import '../../services/station_state_provider.dart';
+import '../common/pagination_control.dart';
+import 'user_form_screen.dart';
 
 class PeopleManagementScreen extends StatefulWidget {
   const PeopleManagementScreen({super.key});
@@ -14,25 +16,22 @@ class PeopleManagementScreen extends StatefulWidget {
 }
 
 class _PeopleManagementScreenState extends State<PeopleManagementScreen> {
-  final TextEditingController _nameController = TextEditingController();
-  final TextEditingController _phoneController = TextEditingController();
-  UserRole _selectedRole = UserRole.shiftStaff;
-  String _selectedShift = 'Morning';
-  String _selectedLanguage = 'Telugu';
-  bool _isSuspended = false;
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _phoneController.dispose();
-    super.dispose();
-  }
+  int _currentPage = 1;
+  static const int _pageSize = 10;
 
   @override
   Widget build(BuildContext context) {
     final state = context.watch<StationStateProvider>();
     final lang = state.currentLanguage;
-    final users = state.allUsers;
+    final allUsers = state.allUsers;
+
+    // Paginate users (10 per page)
+    final totalItems = allUsers.length;
+    final int startIndex = (_currentPage - 1) * _pageSize;
+    final int endIndex = (startIndex + _pageSize).clamp(0, totalItems);
+    final displayedUsers = (startIndex < totalItems)
+        ? allUsers.sublist(startIndex, endIndex)
+        : <UserProfile>[];
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
@@ -43,16 +42,13 @@ class _PeopleManagementScreenState extends State<PeopleManagementScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    AppStrings.get('peopleAndRoles', lang),
-                    style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: StationColors.textDark),
-                  ),
-                  const SizedBox(height: 2),
-                  const Text('Demo • UI review', style: TextStyle(fontSize: 14, color: StationColors.textMedium)),
-                ],
+              Text(
+                AppStrings.get('peopleAndRoles', lang),
+                style: const TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w800,
+                  color: StationColors.textDark,
+                ),
               ),
               ElevatedButton.icon(
                 icon: const Icon(Icons.add, size: 18),
@@ -60,255 +56,276 @@ class _PeopleManagementScreenState extends State<PeopleManagementScreen> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: StationColors.primary,
                   foregroundColor: Colors.white,
+                  minimumSize: const Size(120, 44),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
-                onPressed: () {},
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-
-          // Two-column Layout: Table & Add Person Form
-          LayoutBuilder(
-            builder: (context, constraints) {
-              bool isWide = constraints.maxWidth > 800;
-
-              Widget tableCard = Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(StationDimensions.cardRadius),
-                  border: Border.all(color: StationColors.divider),
-                ),
-                child: Table(
-                  columnWidths: const {
-                    0: FlexColumnWidth(1.2),
-                    1: FlexColumnWidth(1.2),
-                    2: FlexColumnWidth(1.3),
-                    3: FlexColumnWidth(1.1),
-                  },
-                  children: [
-                    const TableRow(
-                      decoration: BoxDecoration(
-                        color: Color(0xFFF7F9F9),
-                        borderRadius: BorderRadius.vertical(top: Radius.circular(StationDimensions.cardRadius)),
-                      ),
-                      children: [
-                        Padding(padding: EdgeInsets.all(14), child: Text('Role', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
-                        Padding(padding: EdgeInsets.all(14), child: Text('Name', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
-                        Padding(padding: EdgeInsets.all(14), child: Text('Assigned shift', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
-                        Padding(padding: EdgeInsets.all(14), child: Text('Status', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
-                      ],
-                    ),
-                    ...users.map((u) {
-                      return TableRow(
-                        decoration: const BoxDecoration(border: Border(top: BorderSide(color: StationColors.divider, width: 0.8))),
-                        children: [
-                          Padding(padding: const EdgeInsets.all(14), child: Text(u.role.displayName, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13))),
-                          Padding(padding: const EdgeInsets.all(14), child: Text(u.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14))),
-                          Padding(padding: const EdgeInsets.all(14), child: Text(u.assignedShift, style: const TextStyle(fontSize: 13, color: StationColors.textMedium))),
-                          Padding(
-                            padding: const EdgeInsets.all(14),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 8,
-                                  height: 8,
-                                  decoration: BoxDecoration(
-                                    color: u.active ? StationColors.successGreen : StationColors.errorRed,
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  u.active ? 'Active' : 'Suspended',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 13,
-                                    color: u.active ? StationColors.successGreen : StationColors.errorRed,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      );
-                    }),
-                  ],
-                ),
-              );
-
-              Widget addPersonCard = Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(StationDimensions.cardRadius),
-                  border: Border.all(color: StationColors.divider),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Add new person', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: _nameController,
-                      decoration: InputDecoration(
-                        labelText: 'Name',
-                        hintText: 'Enter full name',
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: _phoneController,
-                      keyboardType: TextInputType.phone,
-                      decoration: InputDecoration(
-                        labelText: 'Phone number',
-                        hintText: 'Enter phone number',
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<UserRole>(
-                      value: _selectedRole,
-                      decoration: InputDecoration(
-                        labelText: 'Role',
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                      ),
-                      items: UserRole.values.map((r) {
-                        return DropdownMenuItem(value: r, child: Text(r.displayName));
-                      }).toList(),
-                      onChanged: (val) {
-                        if (val != null) setState(() => _selectedRole = val);
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      value: _selectedShift,
-                      decoration: InputDecoration(
-                        labelText: 'Assigned shift',
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                      ),
-                      items: const [
-                        DropdownMenuItem(value: 'Morning', child: Text('Morning')),
-                        DropdownMenuItem(value: 'Evening', child: Text('Evening')),
-                        DropdownMenuItem(value: 'Night', child: Text('Night')),
-                        DropdownMenuItem(value: 'All', child: Text('All shifts')),
-                      ],
-                      onChanged: (val) {
-                        if (val != null) setState(() => _selectedShift = val);
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      value: _selectedLanguage,
-                      decoration: InputDecoration(
-                        labelText: 'Language',
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                      ),
-                      items: const [
-                        DropdownMenuItem(value: 'Telugu', child: Text('Telugu (తెలుగు)')),
-                        DropdownMenuItem(value: 'English', child: Text('English')),
-                      ],
-                      onChanged: (val) {
-                        if (val != null) setState(() => _selectedLanguage = val);
-                      },
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Permissions breakdown
-                    const Text('Permissions (for Shift staff)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                    const SizedBox(height: 6),
-                    const Row(
-                      children: [
-                        Icon(Icons.check_circle, size: 16, color: StationColors.successGreen),
-                        SizedBox(width: 8),
-                        Text('Can scan assigned pumps', style: TextStyle(fontSize: 12)),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    const Row(
-                      children: [
-                        Icon(Icons.cancel, size: 16, color: StationColors.errorRed),
-                        SizedBox(width: 8),
-                        Text('Cannot change rates or users', style: TextStyle(fontSize: 12)),
-                      ],
-                    ),
-                    const SizedBox(height: 18),
-
-                    // Send Invite Button
-                    SizedBox(
-                      width: double.infinity,
-                      height: 46,
-                      child: ElevatedButton.icon(
-                        icon: const Icon(Icons.send_rounded, size: 16, color: Colors.white),
-                        label: const Text('Send invite', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: StationColors.primary,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        ),
-                        onPressed: () {
-                          if (_nameController.text.trim().isEmpty) return;
-                          final newProfile = UserProfile(
-                            id: 'user_${DateTime.now().millisecondsSinceEpoch}',
-                            name: _nameController.text.trim(),
-                            phoneNumber: _phoneController.text.trim(),
-                            role: _selectedRole,
-                            assignedShift: _selectedShift,
-                            preferredLanguage: _selectedLanguage == 'Telugu' ? 'te' : 'en',
-                          );
-                          state.addNewUser(newProfile);
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => UserFormScreen(
+                        onSave: (newUser) {
+                          state.addNewUser(newUser);
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text('Invited ${_nameController.text} as ${_selectedRole.displayName}.'),
+                              content: Text('Added user "${newUser.name}" successfully.'),
                               backgroundColor: StationColors.successGreen,
                             ),
                           );
-                          _nameController.clear();
-                          _phoneController.clear();
                         },
                       ),
                     ),
-                    const SizedBox(height: 14),
+                  );
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
 
-                    // Suspension Toggle (Owner Only)
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('Suspension (owner only)', style: TextStyle(fontSize: 12, color: StationColors.textLight)),
-                        Switch(
-                          value: _isSuspended,
-                          onChanged: (val) => setState(() => _isSuspended = val),
+          // Users Table Container
+          Container(
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(StationDimensions.cardRadius),
+              border: Border.all(color: StationColors.divider),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minWidth: 920),
+                child: DataTable(
+                  headingRowColor: MaterialStateProperty.all(const Color(0xFFF7F9F9)),
+                  dataRowMinHeight: 52,
+                  dataRowMaxHeight: 64,
+                  horizontalMargin: 16,
+                  columnSpacing: 24,
+                  columns: const [
+                    DataColumn(label: Text('Name', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
+                    DataColumn(label: Text('Phone', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
+                    DataColumn(label: Text('Role', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
+                    DataColumn(label: Text('Shift', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
+                    DataColumn(label: Text('Email', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
+                    DataColumn(label: Text('Village & Address', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
+                    DataColumn(label: Text('Status', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
+                    DataColumn(label: Text('Actions', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
+                  ],
+                  rows: displayedUsers.map((u) {
+                    final bool isStaff = u.role == UserRole.shiftStaff;
+                    final String shiftDisplay = isStaff ? (u.assignedShift ?? 'Unassigned') : '—';
+
+                    return DataRow(
+                      cells: [
+                        // 1. Name
+                        DataCell(
+                          Row(
+                            children: [
+                              CircleAvatar(
+                                radius: 14,
+                                backgroundColor: u.role == UserRole.owner
+                                    ? StationColors.primaryLight.withOpacity(0.2)
+                                    : Colors.grey.shade200,
+                                child: Text(
+                                  u.name.isNotEmpty ? u.name[0] : 'U',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: u.role == UserRole.owner
+                                        ? StationColors.primary
+                                        : StationColors.textDark,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                u.name,
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                              ),
+                            ],
+                          ),
+                        ),
+                        // 2. Phone
+                        DataCell(
+                          Text(u.phoneNumber, style: const TextStyle(fontSize: 13, color: StationColors.textDark)),
+                        ),
+                        // 3. Role
+                        DataCell(
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: u.role == UserRole.owner
+                                  ? StationColors.primaryLight.withOpacity(0.15)
+                                  : StationColors.accentOrangeLight,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              u.role.displayName,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: u.role == UserRole.owner
+                                    ? StationColors.primary
+                                    : StationColors.accentOrange,
+                              ),
+                            ),
+                          ),
+                        ),
+                        // 4. Shift (for Shift Staff only, '—' for Owner)
+                        DataCell(
+                          Text(
+                            shiftDisplay,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: isStaff ? StationColors.textDark : StationColors.textLight,
+                              fontWeight: isStaff ? FontWeight.w500 : FontWeight.normal,
+                            ),
+                          ),
+                        ),
+                        // 5. Email
+                        DataCell(
+                          Text(
+                            u.email.isNotEmpty ? u.email : '—',
+                            style: const TextStyle(fontSize: 12, color: StationColors.textMedium),
+                          ),
+                        ),
+                        // 6. Village & Address
+                        DataCell(
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                u.village.isNotEmpty ? u.village : 'Chatrai',
+                                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+                              ),
+                              if (u.address.isNotEmpty)
+                                Text(
+                                  u.address,
+                                  style: const TextStyle(fontSize: 11, color: StationColors.textLight),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                            ],
+                          ),
+                        ),
+                        // 7. Status
+                        DataCell(
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 8,
+                                height: 8,
+                                decoration: BoxDecoration(
+                                  color: u.active ? StationColors.successGreen : StationColors.errorRed,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                u.active ? 'Active' : 'Suspended',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: u.active ? StationColors.successGreen : StationColors.errorRed,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        // 8. Actions (Edit & Delete)
+                        DataCell(
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              // Edit Button
+                              IconButton(
+                                icon: const Icon(Icons.edit_outlined, size: 18, color: StationColors.primary),
+                                tooltip: 'Edit User',
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => UserFormScreen(
+                                        userToEdit: u,
+                                        onSave: (updated) {
+                                          state.updateUser(updated);
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(
+                                              content: Text('Updated user "${updated.name}" successfully.'),
+                                              backgroundColor: StationColors.successGreen,
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                              // Delete Button
+                              IconButton(
+                                icon: const Icon(Icons.delete_outline, size: 18, color: StationColors.errorRed),
+                                tooltip: 'Delete User',
+                                onPressed: () {
+                                  _showDeleteConfirmationDialog(context, state, u);
+                                },
+                              ),
+                            ],
+                          ),
                         ),
                       ],
-                    ),
-                  ],
+                    );
+                  }).toList(),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // 10-Item Pagination Control
+          PaginationControl(
+            currentPage: _currentPage,
+            totalItems: totalItems,
+            pageSize: _pageSize,
+            onPageChanged: (newPage) {
+              setState(() => _currentPage = newPage);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeleteConfirmationDialog(BuildContext context, StationStateProvider state, UserProfile user) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete User Account'),
+        content: Text('Are you sure you want to permanently remove "${user.name}" (${user.email.isNotEmpty ? user.email : user.phoneNumber})?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: StationColors.errorRed),
+            onPressed: () {
+              state.deleteUser(user.id);
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Removed "${user.name}".'),
+                  backgroundColor: StationColors.errorRed,
                 ),
               );
-
-              if (!isWide) {
-                return Column(
-                  children: [
-                    tableCard,
-                    const SizedBox(height: 20),
-                    addPersonCard,
-                  ],
-                );
-              }
-
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(flex: 6, child: tableCard),
-                  const SizedBox(width: 20),
-                  Expanded(flex: 4, child: addPersonCard),
-                ],
-              );
             },
+            child: const Text('Delete', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           ),
         ],
       ),

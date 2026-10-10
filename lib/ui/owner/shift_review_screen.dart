@@ -50,7 +50,7 @@ class _ShiftReviewScreenState extends State<ShiftReviewScreen> {
                     IconButton(icon: const Icon(Icons.chevron_left, size: 20), onPressed: () {}),
                     const Padding(
                       padding: EdgeInsets.symmetric(horizontal: 8),
-                      child: Text('9 Oct 2026 (Sample)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      child: Text('9 Oct 2026', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                     ),
                     IconButton(icon: const Icon(Icons.chevron_right, size: 20), onPressed: () {}),
                   ],
@@ -85,7 +85,7 @@ class _ShiftReviewScreenState extends State<ShiftReviewScreen> {
                   ),
                   children: [
                     Padding(padding: EdgeInsets.all(12), child: Text('Shift', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
-                    Padding(padding: EdgeInsets.all(12), child: Text('Staff (sample)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
+                    Padding(padding: EdgeInsets.all(12), child: Text('Staff', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
                     Padding(padding: EdgeInsets.all(12), child: Text('Pump', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
                     Padding(padding: EdgeInsets.all(12), child: Text('Receipts', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
                     Padding(padding: EdgeInsets.all(12), child: Text('Owner cash', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
@@ -152,7 +152,7 @@ class _ShiftReviewScreenState extends State<ShiftReviewScreen> {
                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: StationColors.textDark),
                     ),
                     const SizedBox(height: 14),
-                    _buildDetailLine('Staff (sample)', shift.staffName),
+                    _buildDetailLine('Staff', shift.staffName),
                     _buildDetailLine('Pump', shift.pumpName),
                     _buildDetailLine('Shift time', shift.timeRange),
                     _buildDetailLine('Receipts', 'Uploaded'),

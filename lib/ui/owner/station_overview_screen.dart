@@ -36,14 +36,6 @@ class StationOverviewScreen extends StatelessWidget {
                   const Text('10 Oct 2026', style: TextStyle(fontSize: 14, color: StationColors.textMedium)),
                 ],
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.05),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: const Text('Illustrative sample data', style: TextStyle(fontSize: 11, color: Colors.black54)),
-              ),
             ],
           ),
           const SizedBox(height: 20),
@@ -98,7 +90,7 @@ class StationOverviewScreen extends StatelessWidget {
                 child: _buildStatCard(
                   title: AppStrings.get('ownerCashReceived', lang),
                   amount: '₹13,074',
-                  subtitle: 'Illustrative sample',
+                  subtitle: 'Today handover',
                   icon: Icons.account_balance_wallet_outlined,
                   iconColor: StationColors.successGreen,
                 ),
@@ -108,7 +100,7 @@ class StationOverviewScreen extends StatelessWidget {
                 child: _buildStatCard(
                   title: AppStrings.get('creditBalance', lang),
                   amount: '₹30,000',
-                  subtitle: 'Illustrative sample',
+                  subtitle: 'Total outstanding',
                   icon: Icons.credit_score_outlined,
                   iconColor: StationColors.creditTeal,
                   onTap: () => onNavigate(4), // Credit tab
@@ -138,7 +130,7 @@ class StationOverviewScreen extends StatelessWidget {
                 3: FlexColumnWidth(1.8),
               },
               children: [
-                _buildTableHeader(['Shift', 'Staff (sample)', 'Time', 'Status']),
+                _buildTableHeader(['Shift', 'Staff', 'Time', 'Status']),
                 _buildShiftRow('Morning', 'Ravi', '6:00 AM - 2:00 PM', 'In progress', StationColors.successGreen),
                 _buildShiftRow('Evening', 'Srikant', '2:00 PM - 10:00 PM', 'Needs category review', StationColors.warningAmber),
                 _buildShiftRow('Night', 'Kishore', '10:00 PM - 6:00 AM', 'Scheduled', StationColors.textLight),

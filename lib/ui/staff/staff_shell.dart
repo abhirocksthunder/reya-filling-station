@@ -39,68 +39,70 @@ class _StaffShellState extends State<StaffShell> {
       ),
     ];
 
+    final screenWidth = MediaQuery.of(context).size.width;
+    final maxShellWidth = 480.0;
+    final barWidth = screenWidth < maxShellWidth ? screenWidth : maxShellWidth;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF0F4F4),
-      appBar: const StationTopBar(),
+      appBar: StationTopBar(
+        onLogout: () => state.logout(),
+      ),
       body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 440),
-          child: Container(
-            decoration: BoxDecoration(
-              color: StationColors.scaffoldBg,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.08),
-                  blurRadius: 15,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: screens[_currentTabIndex],
-          ),
+        child: Container(
+          constraints: BoxConstraints(maxWidth: maxShellWidth),
+          width: double.infinity,
+          height: double.infinity,
+          color: StationColors.scaffoldBg,
+          child: screens[_currentTabIndex],
         ),
       ),
-      bottomNavigationBar: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 440),
-          child: Container(
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              border: Border(top: BorderSide(color: StationColors.divider, width: 0.8)),
-            ),
-            child: BottomNavigationBar(
-              currentIndex: _currentTabIndex,
-              onTap: (index) => setState(() => _currentTabIndex = index),
-              type: BottomNavigationBarType.fixed,
-              backgroundColor: Colors.white,
-              selectedItemColor: StationColors.primary,
-              unselectedItemColor: StationColors.textLight,
-              selectedFontSize: 12,
-              unselectedFontSize: 11,
-              selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold),
-              items: [
-                BottomNavigationBarItem(
-                  icon: const Icon(Icons.home_outlined),
-                  activeIcon: const Icon(Icons.home),
-                  label: AppStrings.get('myShift', lang),
+      bottomNavigationBar: Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          border: Border(top: BorderSide(color: StationColors.divider, width: 0.8)),
+        ),
+        child: SafeArea(
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              SizedBox(
+                width: barWidth,
+                child: BottomNavigationBar(
+                  currentIndex: _currentTabIndex,
+                  onTap: (index) => setState(() => _currentTabIndex = index),
+                  type: BottomNavigationBarType.fixed,
+                  backgroundColor: Colors.white,
+                  selectedItemColor: StationColors.primary,
+                  unselectedItemColor: StationColors.textLight,
+                  selectedFontSize: 12,
+                  unselectedFontSize: 11,
+                  selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold),
+                  items: [
+                    BottomNavigationBarItem(
+                      icon: const Icon(Icons.home_outlined),
+                      activeIcon: const Icon(Icons.home),
+                      label: AppStrings.get('myShift', lang),
+                    ),
+                    BottomNavigationBarItem(
+                      icon: const Icon(Icons.camera_alt_outlined),
+                      activeIcon: const Icon(Icons.camera_alt),
+                      label: AppStrings.get('scan', lang),
+                    ),
+                    BottomNavigationBarItem(
+                      icon: const Icon(Icons.format_list_bulleted_rounded),
+                      activeIcon: const Icon(Icons.format_list_bulleted_rounded),
+                      label: AppStrings.get('entries', lang),
+                    ),
+                    BottomNavigationBarItem(
+                      icon: const Icon(Icons.access_time_rounded),
+                      activeIcon: const Icon(Icons.access_time_filled_rounded),
+                      label: AppStrings.get('close', lang),
+                    ),
+                  ],
                 ),
-                BottomNavigationBarItem(
-                  icon: const Icon(Icons.camera_alt_outlined),
-                  activeIcon: const Icon(Icons.camera_alt),
-                  label: AppStrings.get('scan', lang),
-                ),
-                BottomNavigationBarItem(
-                  icon: const Icon(Icons.format_list_bulleted_rounded),
-                  activeIcon: const Icon(Icons.format_list_bulleted_rounded),
-                  label: AppStrings.get('entries', lang),
-                ),
-                BottomNavigationBarItem(
-                  icon: const Icon(Icons.access_time_rounded),
-                  activeIcon: const Icon(Icons.access_time_filled_rounded),
-                  label: AppStrings.get('close', lang),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),

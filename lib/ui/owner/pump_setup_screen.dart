@@ -39,8 +39,6 @@ class _PumpSetupScreenState extends State<PumpSetupScreen> {
                     AppStrings.get('pumpsAndReceiptSetup', lang),
                     style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: StationColors.textDark),
                   ),
-                  const SizedBox(height: 2),
-                  const Text('Demo • UI review', style: TextStyle(fontSize: 14, color: StationColors.textMedium)),
                 ],
               ),
               ElevatedButton.icon(
@@ -111,7 +109,7 @@ class _PumpSetupScreenState extends State<PumpSetupScreen> {
                                 children: [
                                   Padding(padding: EdgeInsets.all(8), child: Text('Nozzle', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
                                   Padding(padding: EdgeInsets.all(8), child: Text('Fuel type', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
-                                  Padding(padding: EdgeInsets.all(8), child: Text('Mapping (sample)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
+                                  Padding(padding: EdgeInsets.all(8), child: Text('Receipt mapping', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
                                   Padding(padding: EdgeInsets.all(8), child: Text('Previous reading', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
                                 ],
                               ),
