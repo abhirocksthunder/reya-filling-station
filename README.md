@@ -42,6 +42,15 @@ A rural-first petrol filling station management, meter reading capture, and fina
    - **Staff Forecourt Shell**: My Shift, Scan Receipt, Money Entries, Close Shift.
    - **Owner Operations Portal**: Station Overview, Receipt Inbox, Shift Reviews, Daily Money Ledger, Credit Khata, People & Roles, Pumps Setup, Station Settings, and Daily Station Reports.
 
+6. **Operational Governance, Dynamic Categories & Firestore Tools**:
+   - **OCR Camera Restriction Setting**: Station owners/admins can disable shift staff totaliser camera scanning in settings; staff app immediately disables scanning and guides manual reporting.
+   - **Dynamic Entry Categories CRUD**: Fully configurable transaction categories with add, edit, toggle, and an alert dialog confirmation before deletion.
+   - **Shift Timings & Approval Flow**: Configurable morning, evening, and night time ranges by manager; shift staff can request timing changes upon login, requiring manager/owner approval.
+   - **Interactive Calendar & Shift Selectors**: Functional day stepper `< Date >`, calendar date picker (`showDatePicker`), and shift dropdown across Daily Reports and Shift Reviews.
+   - **People Management Filters & Session Tracking**: Real-time search by name, phone, village, and email, alongside Role/Status filters and active session logged-in status chips.
+   - **Category Mapping Audit Dialog**: Replaces temporary feedback with an authoritative dialog to inspect and map uncategorized physical ledger debit entries.
+   - **Developer Testing Controls**: Single-click "Seed to Firestore" and "Clear / Purge Collections" buttons with safety alerts for testing operational states.
+
 ---
 
 ## 📐 Golden Worked Fixture (Reconciliation Proof)

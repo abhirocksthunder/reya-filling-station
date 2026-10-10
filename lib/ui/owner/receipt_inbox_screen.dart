@@ -77,40 +77,75 @@ class _ReceiptInboxScreenState extends State<ReceiptInboxScreen> {
           ),
           const SizedBox(height: 24),
 
-          // Two-Column Layout (Responsive)
-          LayoutBuilder(
-            builder: (context, constraints) {
-              bool isWide = constraints.maxWidth > 800;
-
-              if (!isWide) {
-                return Column(
-                  children: [
-                    _buildReceiptsList(displayedReceipts, totalItems),
-                    const SizedBox(height: 20),
-                    if (selectedScan != null) _buildReviewPane(context, selectedScan, lang),
-                  ],
-                );
-              }
-
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+          // Empty state or Two-Column Layout
+          if (totalItems == 0)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 56),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(StationDimensions.cardRadius),
+                border: Border.all(color: StationColors.divider),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Left List
-                  SizedBox(
-                    width: 320,
-                    child: _buildReceiptsList(displayedReceipts, totalItems),
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: StationColors.primaryLight.withOpacity(0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.receipt_long_outlined, size: 48, color: StationColors.primary),
                   ),
-                  const SizedBox(width: 20),
-                  // Right Detail Pane
-                  Expanded(
-                    child: selectedScan != null
-                        ? _buildReviewPane(context, selectedScan, lang)
-                        : const SizedBox(),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'No receipts recorded yet',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: StationColors.textDark),
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'When shift staff scan pump totalisers or owners upload receipt images, original records will appear here.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 13, color: StationColors.textMedium),
                   ),
                 ],
-              );
-            },
-          ),
+              ),
+            )
+          else
+            LayoutBuilder(
+              builder: (context, constraints) {
+                bool isWide = constraints.maxWidth > 800;
+
+                if (!isWide) {
+                  return Column(
+                    children: [
+                      _buildReceiptsList(displayedReceipts, totalItems),
+                      const SizedBox(height: 20),
+                      if (selectedScan != null) _buildReviewPane(context, selectedScan, lang),
+                    ],
+                  );
+                }
+
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Left List
+                    SizedBox(
+                      width: 320,
+                      child: _buildReceiptsList(displayedReceipts, totalItems),
+                    ),
+                    const SizedBox(width: 20),
+                    // Right Detail Pane
+                    Expanded(
+                      child: selectedScan != null
+                          ? _buildReviewPane(context, selectedScan, lang)
+                          : const SizedBox(),
+                    ),
+                  ],
+                );
+              },
+            ),
         ],
       ),
     );

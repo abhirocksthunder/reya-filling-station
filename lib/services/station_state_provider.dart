@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/user_profile.dart';
 import '../models/pump.dart';
 import '../models/shift.dart';
+import '../models/shift_timing_request.dart';
 import '../models/transaction_entry.dart';
 import '../models/receipt_scan.dart';
 import '../models/credit_customer.dart';
@@ -34,7 +35,13 @@ class StationStateProvider extends ChangeNotifier {
 
   // Active Authenticated User (null if logged out)
   UserProfile? _currentUser;
-  UserProfile get currentUser => _currentUser ?? _allUsers.first;
+  UserProfile get currentUser => _currentUser ?? (_allUsers.isNotEmpty ? _allUsers.first : const UserProfile(
+    id: 'owner_kalyan',
+    name: 'Kalyan',
+    email: 'kalyan@rfs.com',
+    phoneNumber: '+91 98480 11111',
+    role: UserRole.owner,
+  ));
   bool get isAuthenticated => _currentUser != null;
 
   // Station Settings
@@ -72,22 +79,38 @@ class StationStateProvider extends ChangeNotifier {
 
   // Active Shift for Current User
   Shift get activeShift {
-    if (_currentUser != null && _currentUser!.assignedShift != null) {
+    if (_currentUser != null && _currentUser!.assignedShift != null && _allShifts.isNotEmpty) {
       return _allShifts.firstWhere(
         (s) => s.shiftName.toLowerCase() == _currentUser!.assignedShift!.toLowerCase(),
         orElse: () => _allShifts.first,
       );
     }
-    return _allShifts.first;
+    return _allShifts.isNotEmpty ? _allShifts.first : const Shift(
+      id: 'shift_default',
+      shiftName: 'Morning',
+      businessDate: '10 Oct 2026',
+      staffId: 'staff_srikanth',
+      staffName: 'Srikanth',
+      pumpName: 'Pump 1',
+      status: ShiftStatus.inProgress,
+      timeRange: '6:00 AM - 2:00 PM',
+      openingReadingsMl: {1: 169923720, 2: 274487190},
+      closingReadingsMl: {1: 170218850, 2: 275095980},
+      testVolumesMl: {1: 5000, 2: 5000},
+    );
   }
 
-  // Receipts Inbox
+  // Receipts Inbox (Empty by default for original data display)
   List<ReceiptScan> _receipts = [];
   List<ReceiptScan> get receipts => _receipts;
 
   // Credit Customers (Khata)
   List<CreditCustomer> _creditCustomers = [];
   List<CreditCustomer> get creditCustomers => _creditCustomers;
+
+  // Shift Timing Requests
+  List<ShiftTimingRequest> _timingRequests = [];
+  List<ShiftTimingRequest> get timingRequests => _timingRequests;
 
   // Owner Notifications
   List<OwnerNotificationItem> _notifications = [];
@@ -104,12 +127,26 @@ class StationStateProvider extends ChangeNotifier {
   void _initFirestore() {
     try {
       _firestore = FirebaseFirestore.instance;
+      _listenToRemoteSettings();
       _listenToRemoteMembers();
       _listenToRemoteEntries();
       _listenToRemoteReceipts();
+      _listenToRemoteTimingRequests();
     } catch (e) {
       debugPrint('Firestore offline fallback active: $e');
     }
+  }
+
+  void _listenToRemoteSettings() {
+    if (_firestore == null) return;
+    try {
+      _firestore!.collection('stations').doc('chatrai').collection('settings').doc('general').snapshots().listen((doc) {
+        if (doc.exists && doc.data() != null) {
+          _settings = StationSettings.fromMap(doc.data()!);
+          notifyListeners();
+        }
+      });
+    } catch (_) {}
   }
 
   void _listenToRemoteMembers() {
@@ -137,10 +174,8 @@ class StationStateProvider extends ChangeNotifier {
     if (_firestore == null) return;
     try {
       _firestore!.collection('stations').doc('chatrai').collection('entries').snapshots().listen((snapshot) {
-        if (snapshot.docs.isNotEmpty) {
-          _entries = snapshot.docs.map((doc) => TransactionEntry.fromMap(doc.data())).toList();
-          notifyListeners();
-        }
+        _entries = snapshot.docs.map((doc) => TransactionEntry.fromMap(doc.data())).toList();
+        notifyListeners();
       });
     } catch (_) {}
   }
@@ -149,10 +184,18 @@ class StationStateProvider extends ChangeNotifier {
     if (_firestore == null) return;
     try {
       _firestore!.collection('stations').doc('chatrai').collection('scanAttempts').snapshots().listen((snapshot) {
-        if (snapshot.docs.isNotEmpty) {
-          _receipts = snapshot.docs.map((doc) => ReceiptScan.fromMap(doc.data())).toList();
-          notifyListeners();
-        }
+        _receipts = snapshot.docs.map((doc) => ReceiptScan.fromMap(doc.data())).toList();
+        notifyListeners();
+      });
+    } catch (_) {}
+  }
+
+  void _listenToRemoteTimingRequests() {
+    if (_firestore == null) return;
+    try {
+      _firestore!.collection('stations').doc('chatrai').collection('shiftTimingRequests').snapshots().listen((snapshot) {
+        _timingRequests = snapshot.docs.map((doc) => ShiftTimingRequest.fromMap(doc.data())).toList();
+        notifyListeners();
       });
     } catch (_) {}
   }
@@ -166,10 +209,12 @@ class StationStateProvider extends ChangeNotifier {
         email: 'kalyan@rfs.com',
         phoneNumber: '+91 98480 11111',
         role: UserRole.owner,
-        assignedShift: null, // Owners have no shift
+        assignedShift: null,
         village: 'Chatrai',
         address: 'Main Road, Chatrai',
         preferredLanguage: 'en',
+        active: true,
+        isOnline: false,
       ),
       const UserProfile(
         id: 'owner_ranjit',
@@ -177,10 +222,12 @@ class StationStateProvider extends ChangeNotifier {
         email: 'ranjit@rfs.com',
         phoneNumber: '+91 98480 22222',
         role: UserRole.owner,
-        assignedShift: null, // Owners have no shift
+        assignedShift: null,
         village: 'Chatrai',
         address: 'Bypass Road, Chatrai',
         preferredLanguage: 'en',
+        active: true,
+        isOnline: false,
       ),
       const UserProfile(
         id: 'staff_srikanth',
@@ -192,6 +239,8 @@ class StationStateProvider extends ChangeNotifier {
         village: 'Chatrai',
         address: 'Gandhi Nagar, Chatrai',
         preferredLanguage: 'te',
+        active: true,
+        isOnline: false,
       ),
       const UserProfile(
         id: 'staff_kishore',
@@ -203,6 +252,8 @@ class StationStateProvider extends ChangeNotifier {
         village: 'Chatrai',
         address: 'Station Road, Chatrai',
         preferredLanguage: 'te',
+        active: true,
+        isOnline: false,
       ),
     ];
 
@@ -222,7 +273,7 @@ class StationStateProvider extends ChangeNotifier {
             pumpId: 'pump_1',
             nozzleNumber: 1,
             fuelType: 'Petrol',
-            ratePaisePerLitre: 11752, // ₹117.52
+            ratePaisePerLitre: 11752,
             currentTotaliserMl: 169923720,
             previousAcceptedReadingMl: 168676720,
             previousReadingTimestamp: DateTime(2026, 10, 9, 21, 50),
@@ -232,7 +283,7 @@ class StationStateProvider extends ChangeNotifier {
             pumpId: 'pump_1',
             nozzleNumber: 2,
             fuelType: 'Diesel',
-            ratePaisePerLitre: 10521, // ₹105.21
+            ratePaisePerLitre: 10521,
             currentTotaliserMl: 274487190,
             previousAcceptedReadingMl: 273287210,
             previousReadingTimestamp: DateTime(2026, 10, 9, 21, 50),
@@ -405,30 +456,16 @@ class StationStateProvider extends ChangeNotifier {
       ),
     ];
 
-    // 6. Receipts
-    _receipts = [
-      ReceiptScan(
-        id: 'scan_sample_9oct',
-        pumpSerialNumber: '202501001272',
-        fpId: '1',
-        printedDate: '09/10/2026',
-        printedTime: '21:50:29',
-        nozzleCumVolumeMl: {1: 169923720, 2: 274487190},
-        imagePath: 'assets/images/media_1791616403909.jpg',
-        validationStatus: ReceiptValidationStatus.previousDayReceipt,
-        statusMessage: 'This receipt is from 9 Oct 2026. Take today\'s printout.',
-        capturedBy: 'Srikanth',
-        capturedAt: DateTime(2026, 10, 9, 21, 51),
-      ),
-    ];
+    // 6. Receipts Inbox: Empty by default so original records appear without dummy hardcoded slips
+    _receipts = [];
 
     // 7. Notifications
     _notifications = [
       OwnerNotificationItem(
         id: 'notif_1',
-        title: 'New receipt scan from Srikanth',
-        subtitle: 'Pump 1 • 10 Oct 2026 • Verified',
-        timestamp: DateTime(2026, 10, 10, 6, 46),
+        title: 'System active',
+        subtitle: 'Reya Filling Station online • Chatrai',
+        timestamp: DateTime.now(),
       ),
     ];
   }
@@ -441,13 +478,48 @@ class StationStateProvider extends ChangeNotifier {
   }
 
   void switchUser(UserProfile user) {
-    _currentUser = user;
+    final updated = user.copyWith(isOnline: true);
+    _currentUser = updated;
+    int idx = _allUsers.indexWhere((u) => u.id == user.id);
+    if (idx != -1) {
+      _allUsers[idx] = updated;
+    }
+    if (_firestore != null) {
+      try {
+        _firestore!.collection('stations').doc('chatrai').collection('members').doc(user.id).update({
+          'isOnline': true,
+        });
+      } catch (_) {}
+    }
     notifyListeners();
   }
 
   void logout() {
+    if (_currentUser != null) {
+      final user = _currentUser!;
+      int idx = _allUsers.indexWhere((u) => u.id == user.id);
+      if (idx != -1) {
+        _allUsers[idx] = user.copyWith(isOnline: false);
+      }
+      if (_firestore != null) {
+        try {
+          _firestore!.collection('stations').doc('chatrai').collection('members').doc(user.id).update({
+            'isOnline': false,
+          });
+        } catch (_) {}
+      }
+    }
     _currentUser = null;
     notifyListeners();
+  }
+
+  bool isUserOnline(String userId) {
+    if (_currentUser?.id == userId) return true;
+    final match = _allUsers.firstWhere(
+      (u) => u.id == userId,
+      orElse: () => const UserProfile(id: '', name: '', phoneNumber: '', role: UserRole.shiftStaff),
+    );
+    return match.isOnline;
   }
 
   void toggleGeofenceSimulation() {
@@ -457,13 +529,25 @@ class StationStateProvider extends ChangeNotifier {
 
   void addTransactionEntry(TransactionEntry entry) {
     _entries.insert(0, entry);
-    // Sync to Firestore if online
     if (_firestore != null) {
       try {
         _firestore!.collection('stations').doc('chatrai').collection('entries').doc(entry.id).set(entry.toMap());
       } catch (_) {}
     }
     notifyListeners();
+  }
+
+  void updateTransactionEntry(TransactionEntry updatedEntry) {
+    int idx = _entries.indexWhere((e) => e.id == updatedEntry.id);
+    if (idx != -1) {
+      _entries[idx] = updatedEntry;
+      if (_firestore != null) {
+        try {
+          _firestore!.collection('stations').doc('chatrai').collection('entries').doc(updatedEntry.id).set(updatedEntry.toMap());
+        } catch (_) {}
+      }
+      notifyListeners();
+    }
   }
 
   void saveReceiptScan(ReceiptScan scan) {
@@ -500,9 +584,105 @@ class StationStateProvider extends ChangeNotifier {
 
   void updateSettings(StationSettings newSettings) {
     _settings = newSettings;
+    if (_firestore != null) {
+      try {
+        _firestore!.collection('stations').doc('chatrai').collection('settings').doc('general').set(newSettings.toMap());
+      } catch (_) {}
+    }
     notifyListeners();
   }
 
+  // --- Dynamic Categories CRUD ---
+  void addCategory(CategoryItem category) {
+    List<CategoryItem> updated = List.from(_settings.categories);
+    updated.add(category);
+    updateSettings(_settings.copyWith(categories: updated));
+  }
+
+  void updateCategory(CategoryItem category) {
+    List<CategoryItem> updated = _settings.categories.map((c) => c.id == category.id ? category : c).toList();
+    updateSettings(_settings.copyWith(categories: updated));
+  }
+
+  void deleteCategory(String categoryId) {
+    List<CategoryItem> updated = _settings.categories.where((c) => c.id != categoryId).toList();
+    updateSettings(_settings.copyWith(categories: updated));
+  }
+
+  // --- Shift Timings & Timing Requests ---
+  void updateShiftTiming(String shiftName, String timeRange) {
+    Map<String, String> updated = Map.from(_settings.shiftTimings);
+    updated[shiftName] = timeRange;
+    updateSettings(_settings.copyWith(shiftTimings: updated));
+  }
+
+  Future<void> requestShiftTimingChange({
+    required String staffId,
+    required String staffName,
+    required String requestedShift,
+    required String timingRange,
+    String reason = '',
+  }) async {
+    final req = ShiftTimingRequest(
+      id: 'req_${DateTime.now().millisecondsSinceEpoch}',
+      staffId: staffId,
+      staffName: staffName,
+      requestedShift: requestedShift,
+      timingRange: timingRange,
+      reason: reason,
+      status: 'pending',
+      requestedAt: DateTime.now(),
+    );
+    _timingRequests.insert(0, req);
+    if (_firestore != null) {
+      try {
+        await _firestore!.collection('stations').doc('chatrai').collection('shiftTimingRequests').doc(req.id).set(req.toMap());
+      } catch (_) {}
+    }
+    notifyListeners();
+  }
+
+  Future<void> approveShiftTiming(String requestId) async {
+    int idx = _timingRequests.indexWhere((r) => r.id == requestId);
+    if (idx != -1) {
+      final req = _timingRequests[idx].copyWith(status: 'approved');
+      _timingRequests[idx] = req;
+
+      // Update staff member assignedShift
+      int userIdx = _allUsers.indexWhere((u) => u.id == req.staffId);
+      if (userIdx != -1) {
+        final updatedUser = _allUsers[userIdx].copyWith(assignedShift: req.requestedShift);
+        updateUser(updatedUser);
+      }
+
+      if (_firestore != null) {
+        try {
+          await _firestore!.collection('stations').doc('chatrai').collection('shiftTimingRequests').doc(req.id).update({
+            'status': 'approved',
+          });
+        } catch (_) {}
+      }
+      notifyListeners();
+    }
+  }
+
+  Future<void> rejectShiftTiming(String requestId) async {
+    int idx = _timingRequests.indexWhere((r) => r.id == requestId);
+    if (idx != -1) {
+      final req = _timingRequests[idx].copyWith(status: 'rejected');
+      _timingRequests[idx] = req;
+      if (_firestore != null) {
+        try {
+          await _firestore!.collection('stations').doc('chatrai').collection('shiftTimingRequests').doc(req.id).update({
+            'status': 'rejected',
+          });
+        } catch (_) {}
+      }
+      notifyListeners();
+    }
+  }
+
+  // --- Users CRUD ---
   void addNewUser(UserProfile newUser) {
     _allUsers.add(newUser);
     if (_firestore != null) {
@@ -537,6 +717,79 @@ class StationStateProvider extends ChangeNotifier {
       } catch (_) {}
     }
     notifyListeners();
+  }
+
+  // --- Authoritative Firestore Seeding & Single-Click Purge ---
+  Future<String> seedAuthoritativeDataToFirestore() async {
+    if (_firestore == null) {
+      return 'Firestore is offline. Connect to internet and try again.';
+    }
+
+    try {
+      // 1. Station Document
+      await _firestore!.collection('stations').doc('chatrai').set({
+        'stationName': 'Reya Filling Station',
+        'village': 'Chatrai',
+        'district': 'Eluru / Krishna',
+        'state': 'Andhra Pradesh',
+        'latitude': _settings.latitude,
+        'longitude': _settings.longitude,
+        'radiusMeters': _settings.radiusMeters,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      // 2. Settings
+      await _firestore!.collection('stations').doc('chatrai').collection('settings').doc('general').set(_settings.toMap());
+
+      // 3. Authoritative Members (Kalyan, Ranjit, Srikanth, Kishore)
+      for (var u in _allUsers) {
+        await _firestore!.collection('stations').doc('chatrai').collection('members').doc(u.id).set(u.toMap());
+      }
+
+      // 4. Dispensers & Pumps
+      for (var p in _pumps) {
+        await _firestore!.collection('stations').doc('chatrai').collection('pumps').doc(p.id).set(p.toMap());
+      }
+
+      return 'Successfully seeded station, owners Kalyan & Ranjit, pumps, and settings to Firestore!';
+    } catch (e) {
+      return 'Error seeding Firestore: $e';
+    }
+  }
+
+  Future<String> clearAllFirestoreCollections() async {
+    if (_firestore == null) {
+      return 'Firestore is offline.';
+    }
+
+    try {
+      // Clear entries
+      final entriesSnap = await _firestore!.collection('stations').doc('chatrai').collection('entries').get();
+      for (var doc in entriesSnap.docs) {
+        await doc.reference.delete();
+      }
+
+      // Clear scanAttempts
+      final scansSnap = await _firestore!.collection('stations').doc('chatrai').collection('scanAttempts').get();
+      for (var doc in scansSnap.docs) {
+        await doc.reference.delete();
+      }
+
+      // Clear shiftTimingRequests
+      final reqsSnap = await _firestore!.collection('stations').doc('chatrai').collection('shiftTimingRequests').get();
+      for (var doc in reqsSnap.docs) {
+        await doc.reference.delete();
+      }
+
+      _entries = [];
+      _receipts = [];
+      _timingRequests = [];
+      notifyListeners();
+
+      return 'Firestore operational collections (entries, scans, timing requests) cleared successfully.';
+    } catch (e) {
+      return 'Error clearing collections: $e';
+    }
   }
 
   ShiftReconciliationReport get sampleShiftReport {

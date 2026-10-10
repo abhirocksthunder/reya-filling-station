@@ -37,6 +37,7 @@ class UserProfile {
   final String address;
   final String preferredLanguage; // "te" or "en"
   final bool active;
+  final bool isOnline;
   final List<String> permissions;
 
   const UserProfile({
@@ -50,6 +51,7 @@ class UserProfile {
     this.address = 'Chatrai, Andhra Pradesh',
     this.preferredLanguage = 'te',
     this.active = true,
+    this.isOnline = false,
     this.permissions = const [],
   });
 
@@ -64,6 +66,7 @@ class UserProfile {
     String? address,
     String? preferredLanguage,
     bool? active,
+    bool? isOnline,
     List<String>? permissions,
   }) {
     return UserProfile(
@@ -77,6 +80,7 @@ class UserProfile {
       address: address ?? this.address,
       preferredLanguage: preferredLanguage ?? this.preferredLanguage,
       active: active ?? this.active,
+      isOnline: isOnline ?? this.isOnline,
       permissions: permissions ?? this.permissions,
     );
   }
@@ -93,6 +97,7 @@ class UserProfile {
       'address': address,
       'preferredLanguage': preferredLanguage,
       'active': active,
+      'isOnline': isOnline,
       'permissions': permissions,
     };
   }
@@ -112,6 +117,7 @@ class UserProfile {
       address: map['address'] ?? 'Chatrai, Andhra Pradesh',
       preferredLanguage: map['preferredLanguage'] ?? 'te',
       active: map['active'] ?? true,
+      isOnline: map['isOnline'] ?? false,
       permissions: List<String>.from(map['permissions'] ?? []),
     );
   }

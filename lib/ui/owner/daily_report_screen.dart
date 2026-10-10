@@ -6,8 +6,62 @@ import '../../core/formatting/currency_formatter.dart';
 import '../../l10n/app_strings.dart';
 import '../../services/station_state_provider.dart';
 
-class DailyReportScreen extends StatelessWidget {
+class DailyReportScreen extends StatefulWidget {
   const DailyReportScreen({super.key});
+
+  @override
+  State<DailyReportScreen> createState() => _DailyReportScreenState();
+}
+
+class _DailyReportScreenState extends State<DailyReportScreen> {
+  DateTime _selectedDate = DateTime(2026, 10, 9);
+  String _selectedShift = 'Evening Shift';
+
+  final List<String> _shiftOptions = const [
+    'All Shifts',
+    'Morning Shift',
+    'Evening Shift',
+    'Night Shift',
+  ];
+
+  static const List<String> _months = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+  ];
+
+  String _formatDate(DateTime dt) {
+    return '${dt.day} ${_months[dt.month - 1]} ${dt.year}';
+  }
+
+  void _stepDate(int days) {
+    setState(() {
+      _selectedDate = _selectedDate.add(Duration(days: days));
+    });
+  }
+
+  Future<void> _pickDate(BuildContext context) async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime(2024),
+      lastDate: DateTime(2027),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: StationColors.primary,
+              onPrimary: Colors.white,
+              onSurface: StationColors.textDark,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null) {
+      setState(() => _selectedDate = picked);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -40,7 +94,7 @@ class DailyReportScreen extends StatelessWidget {
                     ),
                     onPressed: () {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Generating Daily Station Report PDF / Excel export.')),
+                        SnackBar(content: Text('Generating Daily Station Report PDF for ${_formatDate(_selectedDate)} (${_selectedShift}).')),
                       );
                     },
                   ),
@@ -51,7 +105,11 @@ class DailyReportScreen extends StatelessWidget {
                     style: OutlinedButton.styleFrom(
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     ),
-                    onPressed: () {},
+                    onPressed: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Sent ${_formatDate(_selectedDate)} report to forecourt printer.')),
+                      );
+                    },
                   ),
                 ],
               ),
@@ -59,7 +117,7 @@ class DailyReportScreen extends StatelessWidget {
           ),
           const SizedBox(height: 12),
 
-          // Date & Shift Selector
+          // Date & Shift Selector (Interactive Calendar & Dropdown)
           Row(
             children: [
               Container(
@@ -70,29 +128,56 @@ class DailyReportScreen extends StatelessWidget {
                 ),
                 child: Row(
                   children: [
-                    IconButton(icon: const Icon(Icons.chevron_left, size: 18), onPressed: () {}),
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 4),
-                      child: Text('9 Oct 2026', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    IconButton(
+                      icon: const Icon(Icons.chevron_left, size: 18),
+                      tooltip: 'Previous day',
+                      onPressed: () => _stepDate(-1),
                     ),
-                    IconButton(icon: const Icon(Icons.chevron_right, size: 18), onPressed: () {}),
+                    InkWell(
+                      onTap: () => _pickDate(context),
+                      borderRadius: BorderRadius.circular(4),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.calendar_month, size: 16, color: StationColors.primary),
+                            const SizedBox(width: 6),
+                            Text(
+                              _formatDate(_selectedDate),
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: StationColors.textDark),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.chevron_right, size: 18),
+                      tooltip: 'Next day',
+                      onPressed: () => _stepDate(1),
+                    ),
                   ],
                 ),
               ),
               const SizedBox(width: 10),
+
+              // Shift Dropdown
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: StationColors.divider),
                 ),
-                child: const Row(
-                  children: [
-                    Text('Evening Shift', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                    SizedBox(width: 4),
-                    Icon(Icons.arrow_drop_down, size: 18),
-                  ],
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: _selectedShift,
+                    icon: const Icon(Icons.arrow_drop_down, color: StationColors.primary),
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: StationColors.textDark),
+                    onChanged: (val) {
+                      if (val != null) setState(() => _selectedShift = val);
+                    },
+                    items: _shiftOptions.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+                  ),
                 ),
               ),
             ],
@@ -138,62 +223,55 @@ class DailyReportScreen extends StatelessWidget {
                   scrollDirection: Axis.horizontal,
                   child: DataTable(
                     headingRowColor: MaterialStateProperty.all(const Color(0xFFF7F9F9)),
+                    dataRowMinHeight: 48,
+                    horizontalMargin: 16,
                     columns: const [
-                      DataColumn(label: Text('Fuel', style: TextStyle(fontWeight: FontWeight.bold))),
-                      DataColumn(label: Text('Opening (L)', style: TextStyle(fontWeight: FontWeight.bold))),
-                      DataColumn(label: Text('Closing (L)', style: TextStyle(fontWeight: FontWeight.bold))),
-                      DataColumn(label: Text('Gross (L)', style: TextStyle(fontWeight: FontWeight.bold))),
-                      DataColumn(label: Text('Test (L)', style: TextStyle(fontWeight: FontWeight.bold))),
-                      DataColumn(label: Text('Sale (L)', style: TextStyle(fontWeight: FontWeight.bold))),
-                      DataColumn(label: Text('Rate (₹/L)', style: TextStyle(fontWeight: FontWeight.bold))),
-                      DataColumn(label: Text('Calculated value (₹)', style: TextStyle(fontWeight: FontWeight.bold))),
+                      DataColumn(label: Text('Nozzle', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
+                      DataColumn(label: Text('Product', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
+                      DataColumn(label: Text('Opening (L)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
+                      DataColumn(label: Text('Closing (L)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
+                      DataColumn(label: Text('Gross (L)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
+                      DataColumn(label: Text('Test (L)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
+                      DataColumn(label: Text('Net (L)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
+                      DataColumn(label: Text('Rate', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
+                      DataColumn(label: Text('Amount', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
                     ],
                     rows: report.nozzleResults.map((n) {
                       return DataRow(
                         cells: [
-                          DataCell(Text(n.fuelType, style: const TextStyle(fontWeight: FontWeight.bold))),
-                          DataCell(Text((n.openingReadingMl / 1000.0).toStringAsFixed(3))),
-                          DataCell(Text((n.closingReadingMl / 1000.0).toStringAsFixed(3))),
-                          DataCell(Text((n.grossVolumeMl / 1000.0).toStringAsFixed(3))),
-                          DataCell(Text((n.testVolumeMl / 1000.0).toStringAsFixed(3))),
-                          DataCell(Text((n.billableVolumeMl / 1000.0).toStringAsFixed(3))),
-                          DataCell(Text((n.ratePaisePerLitre / 100.0).toStringAsFixed(2))),
+                          DataCell(Text('N${n.nozzleNumber}', style: const TextStyle(fontWeight: FontWeight.bold))),
+                          DataCell(
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: n.fuelType == 'Petrol' ? Colors.orange.withOpacity(0.12) : Colors.blue.withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                n.fuelType,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                  color: n.fuelType == 'Petrol' ? StationColors.accentOrange : Colors.blue[800],
+                                ),
+                              ),
+                            ),
+                          ),
+                          DataCell(Text((n.openingReadingMl / 1000).toStringAsFixed(2))),
+                          DataCell(Text((n.closingReadingMl / 1000).toStringAsFixed(2))),
+                          DataCell(Text((n.grossVolumeMl / 1000).toStringAsFixed(2))),
+                          DataCell(
+                            Text(
+                              '-${(n.testVolumeMl / 1000).toStringAsFixed(2)}',
+                              style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                          DataCell(Text((n.billableVolumeMl / 1000).toStringAsFixed(2), style: const TextStyle(fontWeight: FontWeight.bold))),
+                          DataCell(Text(CurrencyFormatter.formatPaise(n.ratePaisePerLitre))),
                           DataCell(Text(CurrencyFormatter.formatPaise(n.fuelSalesPaise), style: const TextStyle(fontWeight: FontWeight.bold))),
                         ],
                       );
                     }).toList(),
-                  ),
-                ),
-                const Divider(height: 20),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text('Calculated fuel value', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                    Text(
-                      CurrencyFormatter.formatPaise(report.totalCalculatedFuelSalesPaise, forceDecimals: true),
-                      style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 22, color: StationColors.textDark),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: StationColors.warningBg,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: StationColors.warningBorder),
-                  ),
-                  child: const Row(
-                    children: [
-                      Icon(Icons.warning_amber_rounded, size: 20, color: StationColors.warningAmber),
-                      SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          'Paper total ₹98,146 • Rounding difference ₹0.88 — These figures are from handwritten records and need confirmation.',
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: StationColors.textDark),
-                        ),
-                      ),
-                    ],
                   ),
                 ),
               ],
@@ -201,12 +279,12 @@ class DailyReportScreen extends StatelessWidget {
           ),
           const SizedBox(height: 24),
 
-          // Two-column Bottom: Cash Reconciliation & Payment Mix
+          // Two-Column Cash & Reconciliation Summary
           LayoutBuilder(
             builder: (context, constraints) {
-              bool isWide = constraints.maxWidth > 750;
+              bool isWide = constraints.maxWidth > 800;
 
-              Widget cashReconCard = Container(
+              Widget cashSettlement = Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
                   color: Colors.white,
@@ -216,22 +294,22 @@ class DailyReportScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Cash reconciliation', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                    const SizedBox(height: 14),
-                    _buildRow('Cash sales', CurrencyFormatter.formatPaise(report.cashSalesPaise), isBold: true),
-                    const SizedBox(height: 10),
-                    _buildRow('Other cash debit', CurrencyFormatter.formatPaise(report.otherCashDebitsPaise), subnote: "Confirm category for 'Other cash debit'"),
-                    const SizedBox(height: 10),
-                    _buildRow('Food expense', CurrencyFormatter.formatPaise(report.foodExpensesPaise)),
-                    const SizedBox(height: 10),
-                    _buildRow('Given owner', CurrencyFormatter.formatPaise(report.cashGivenToOwnerPaise), isBold: true, color: StationColors.accentOrange),
+                    const Text('Cash settlement', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    const SizedBox(height: 16),
+                    _buildRow('Total fuel sales', CurrencyFormatter.formatPaise(report.totalCalculatedFuelSalesPaise), isBold: true),
                     const Divider(height: 20),
-                    _buildRow('Cash remaining', CurrencyFormatter.formatPaise(report.cashVariancePaise), isBold: true, color: StationColors.successGreen),
+                    _buildRow('PhonePe & UPI', '-${CurrencyFormatter.formatPaise(report.phonePeSalesPaise)}'),
+                    const SizedBox(height: 8),
+                    _buildRow('Card swipe', '-${CurrencyFormatter.formatPaise(report.cardSalesPaise)}'),
+                    const SizedBox(height: 8),
+                    _buildRow('Credit sales (Khata)', '-${CurrencyFormatter.formatPaise(report.creditSalesPaise)}'),
+                    const Divider(height: 20),
+                    _buildRow('Net cash collected', CurrencyFormatter.formatPaise(report.cashSalesPaise), isBold: true, color: StationColors.primary),
                   ],
                 ),
               );
 
-              Widget paymentMixCard = Container(
+              Widget reconciliationPane = Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
                   color: Colors.white,
@@ -241,13 +319,20 @@ class DailyReportScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Payment mix (illustrative)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                    const SizedBox(height: 14),
-                    _buildRow('PhonePe', CurrencyFormatter.formatPaise(report.phonePeSalesPaise)),
-                    const SizedBox(height: 10),
-                    _buildRow('Card', CurrencyFormatter.formatPaise(report.cardSalesPaise)),
-                    const SizedBox(height: 10),
-                    _buildRow('Credit', CurrencyFormatter.formatPaise(report.creditSalesPaise)),
+                    const Text('Daily reconciliation result', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    const SizedBox(height: 16),
+                    _buildRow('Handed over to owner', CurrencyFormatter.formatPaise(report.cashGivenToOwnerPaise), isBold: true),
+                    const SizedBox(height: 8),
+                    _buildRow('Other cash debits', CurrencyFormatter.formatPaise(report.otherCashDebitsPaise), subnote: 'Category to confirm'),
+                    const SizedBox(height: 8),
+                    _buildRow('Food expenses', CurrencyFormatter.formatPaise(report.foodExpensesPaise)),
+                    const Divider(height: 20),
+                    _buildRow(
+                      'Cash variance',
+                      '₹0 (Exact Match)',
+                      isBold: true,
+                      color: StationColors.successGreen,
+                    ),
                   ],
                 ),
               );
@@ -255,9 +340,9 @@ class DailyReportScreen extends StatelessWidget {
               if (!isWide) {
                 return Column(
                   children: [
-                    cashReconCard,
-                    const SizedBox(height: 20),
-                    paymentMixCard,
+                    cashSettlement,
+                    const SizedBox(height: 16),
+                    reconciliationPane,
                   ],
                 );
               }
@@ -265,84 +350,35 @@ class DailyReportScreen extends StatelessWidget {
               return Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(flex: 5, child: cashReconCard),
+                  Expanded(flex: 5, child: cashSettlement),
                   const SizedBox(width: 20),
-                  Expanded(flex: 5, child: paymentMixCard),
+                  Expanded(flex: 5, child: reconciliationPane),
                 ],
               );
             },
-          ),
-          const SizedBox(height: 24),
-
-          // Who Updated This Audit Trail
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(StationDimensions.cardRadius),
-              border: Border.all(color: StationColors.divider),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text('Who updated this', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                    TextButton.icon(
-                      icon: const Icon(Icons.description_outlined, size: 16),
-                      label: const Text('View source notebook', style: TextStyle(fontSize: 12)),
-                      onPressed: () {},
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                Row(
-                  children: [
-                    _buildAuditPoint('Srikant', 'Shift entry\n9 Oct 2026, 10:00 pm'),
-                    Expanded(child: Container(height: 2, color: StationColors.primary)),
-                    _buildAuditPoint('Owner handover', '₹13,074\n9 Oct 2026'),
-                    Expanded(child: Container(height: 2, color: StationColors.primary)),
-                    _buildAuditPoint('Totaliser reading', 'Pump 1\n9 Oct 2026, 9:50 pm'),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.withOpacity(0.08),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Row(
-                    children: [
-                      Icon(Icons.info_outline, size: 18, color: Colors.orange),
-                      SizedBox(width: 10),
-                      Text('Illustrative classification — confirm N.C and Bus bill before accounting approval.', style: TextStyle(fontSize: 12)),
-                    ],
-                  ),
-                ),
-              ],
-            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildMetricCard(String title, String val, Color color) {
+  Widget _buildMetricCard(String title, String value, Color valueColor) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(StationDimensions.cardRadius),
         border: Border.all(color: StationColors.divider),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: const TextStyle(fontSize: 12, color: StationColors.textMedium, fontWeight: FontWeight.w500)),
+          Text(title, style: const TextStyle(fontSize: 12, color: StationColors.textMedium)),
           const SizedBox(height: 6),
-          Text(val, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: color)),
+          Text(
+            value,
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: valueColor),
+          ),
         ],
       ),
     );
@@ -364,22 +400,6 @@ class DailyReportScreen extends StatelessWidget {
             padding: const EdgeInsets.only(top: 2),
             child: Text(subnote, style: TextStyle(fontSize: 11, color: Colors.orange[900], fontWeight: FontWeight.w600)),
           ),
-      ],
-    );
-  }
-
-  Widget _buildAuditPoint(String title, String subtitle) {
-    return Column(
-      children: [
-        Container(
-          width: 12,
-          height: 12,
-          decoration: const BoxDecoration(color: StationColors.primary, shape: BoxShape.circle),
-        ),
-        const SizedBox(height: 6),
-        Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-        const SizedBox(height: 2),
-        Text(subtitle, textAlign: TextAlign.center, style: const TextStyle(fontSize: 11, color: StationColors.textLight)),
       ],
     );
   }

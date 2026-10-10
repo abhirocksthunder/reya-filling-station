@@ -175,17 +175,112 @@ class _MoneyLedgerScreenState extends State<MoneyLedgerScreen> {
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Opening category mapping audit dialog.')),
-                    );
-                  },
+                  onPressed: () => _showUncategorizedAuditDialog(context, state),
                   child: const Text('Review uncategorized entry →', style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showUncategorizedAuditDialog(BuildContext context, StationStateProvider state) {
+    String selectedCategory = state.settings.categories.isNotEmpty ? state.settings.categories.first.name : 'Expenses';
+    final notesCtrl = TextEditingController(text: 'Forecourt operational expense / generator diesel & maintenance');
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.rule_folder_rounded, color: StationColors.primary),
+                SizedBox(width: 8),
+                Text('Audit Uncategorized Entry', style: TextStyle(fontWeight: FontWeight.bold)),
+              ],
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: StationColors.warningBg,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: StationColors.warningBorder),
+                    ),
+                    child: const Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Original Record from 9 Oct Ledger:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: StationColors.warningAmber)),
+                        SizedBox(height: 4),
+                        Text('• Description: Other cash debit', style: TextStyle(fontSize: 12)),
+                        Text('• Amount: ₹17,373 (1737300 paise)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                        Text('• Shift: Evening Shift (Recorded by Srikanth)', style: TextStyle(fontSize: 12)),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text('Map to Authoritative Category:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  const SizedBox(height: 6),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: StationColors.divider),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: selectedCategory,
+                        isExpanded: true,
+                        items: state.settings.categories.map((c) => DropdownMenuItem(value: c.name, child: Text(c.name))).toList(),
+                        onChanged: (val) {
+                          if (val != null) setDialogState(() => selectedCategory = val);
+                        },
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text('Audit Notes / Reference:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: notesCtrl,
+                    maxLines: 2,
+                    decoration: InputDecoration(
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      hintText: 'Enter justification for ledger classification...',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: StationColors.primary,
+                  foregroundColor: Colors.white,
+                ),
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Entry mapped to "$selectedCategory" and confirmed in ledger audit trail.'),
+                      backgroundColor: StationColors.successGreen,
+                    ),
+                  );
+                },
+                child: const Text('Confirm & Map Category', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

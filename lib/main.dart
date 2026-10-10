@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
+import 'firebase_options.dart';
 import 'core/constants/colors.dart';
 import 'models/user_profile.dart';
 import 'services/station_state_provider.dart';
@@ -7,8 +9,15 @@ import 'ui/auth/login_screen.dart';
 import 'ui/staff/staff_shell.dart';
 import 'ui/owner/owner_shell.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } catch (e) {
+    debugPrint('Firebase initialization fallback: $e');
+  }
   runApp(
     MultiProvider(
       providers: [

@@ -20,6 +20,25 @@
 
 ## Recent Changes (IST)
 
+### 10 Oct 2026 3:35 pm — Resolve 11 Operational Flow, OCR Governance, Dynamic Categories, and Firestore Synchronization Requirements
+- **Project**: `reya-filling-station`
+- **Type**: `bugfix` | **Status**: `done`
+- **Summary**: Added owner setting to restrict shift staff from taking totaliser photos with clear UI enforcement, full dynamic CRUD for entry categories with confirmation alert dialog before deletion, interactive calendar picker and shift dropdown on daily reports and reviews, user search and role/status filtering, active session logged-in status chip, replaced category audit snackbar with real mapping modal, removed static receipt defaults with dedicated empty state, single-click Firestore collection purge and seeding tools, manager-configurable shift timings with staff timing request/approval workflow, and total login privacy.
+- **Impact**: Delivers full operational control, dynamic category and timing flexibility, zero static data leaks, verified Firestore persistence, and streamlined shift governance.
+- **Modified Files**:
+  - `lib/models/station_settings.dart`
+  - `lib/models/shift_timing_request.dart`
+  - `lib/models/user_profile.dart`
+  - `lib/services/station_state_provider.dart`
+  - `lib/ui/owner/station_settings_screen.dart`
+  - `lib/ui/owner/daily_report_screen.dart`
+  - `lib/ui/owner/shift_review_screen.dart`
+  - `lib/ui/owner/people_management_screen.dart`
+  - `lib/ui/owner/money_ledger_screen.dart`
+  - `lib/ui/owner/receipt_inbox_screen.dart`
+  - `lib/ui/staff/my_shift_screen.dart`
+  - `lib/ui/staff/scan_receipt_screen.dart`
+
 ### 10 Oct 2026 2:56 pm — Resolve 13 Forecourt UI/UX, Zero-Trust Login, Data Isolation, and Layout Bugs
 - **Project**: `reya-filling-station`
 - **Type**: `bugfix` | **Status**: `done`

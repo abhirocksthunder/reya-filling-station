@@ -100,6 +100,32 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen> {
           ),
           const SizedBox(height: 16),
 
+          // Owner Restriction Warning Banner
+          if (!state.settings.allowStaffTotaliserCameraScan) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                color: StationColors.warningBg,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: StationColors.warningBorder),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.lock_rounded, color: StationColors.warningAmber, size: 24),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Totaliser Photo Restricted: Station owner has disabled staff totaliser camera capture in settings. Please report meter readings manually to the shift manager.',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: StationColors.textDark),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
           // Printed Receipt View Card
           Container(
             width: double.infinity,
@@ -297,7 +323,16 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen> {
                         borderRadius: BorderRadius.circular(StationDimensions.buttonRadius),
                       ),
                     ),
-                    onPressed: () {
+                    onPressed: !state.settings.allowStaffTotaliserCameraScan
+                        ? () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Totaliser camera scan is restricted by Station Owner in settings.'),
+                                backgroundColor: StationColors.errorRed,
+                              ),
+                            );
+                          }
+                        : () {
                       final scan = ReceiptScan(
                         id: 'scan_${DateTime.now().millisecondsSinceEpoch}',
                         pumpSerialNumber: sample['pumpSNo'],

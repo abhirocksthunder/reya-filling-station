@@ -15,8 +15,8 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final TextEditingController _identifierController = TextEditingController(text: 'kalyan@rfs.com');
-  final TextEditingController _pinController = TextEditingController(text: '1234');
+  final TextEditingController _identifierController = TextEditingController();
+  final TextEditingController _pinController = TextEditingController();
   bool _isLoading = false;
   String? _errorMessage;
 
@@ -204,35 +204,6 @@ class _LoginScreenState extends State<LoginScreen> {
                               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
                             ),
                     ),
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Quick Account Selection
-                  const Divider(),
-                  const SizedBox(height: 8),
-                  const Text('Select Account:', style: TextStyle(fontSize: 12, color: StationColors.textLight, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 10),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    alignment: WrapAlignment.center,
-                    children: state.allUsers.map((u) {
-                      return ActionChip(
-                        avatar: Icon(
-                          u.role == UserRole.owner ? Icons.shield : Icons.person,
-                          size: 14,
-                          color: u.role == UserRole.owner ? StationColors.accentOrange : StationColors.primary,
-                        ),
-                        label: Text(
-                          '${u.name} (${u.role.displayName})',
-                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-                        ),
-                        onPressed: () {
-                          _identifierController.text = u.email.isNotEmpty ? u.email : u.phoneNumber;
-                          _handleLogin(state);
-                        },
-                      );
-                    }).toList(),
                   ),
                 ],
               ),

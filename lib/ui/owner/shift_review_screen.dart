@@ -18,6 +18,38 @@ class ShiftReviewScreen extends StatefulWidget {
 
 class _ShiftReviewScreenState extends State<ShiftReviewScreen> {
   int _selectedShiftIdx = 1; // Default: Evening Srikant (index 1)
+  DateTime _selectedDate = DateTime(2026, 10, 9);
+
+  static const List<String> _months = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+  ];
+
+  String _formatDate(DateTime dt) => '${dt.day} ${_months[dt.month - 1]} ${dt.year}';
+
+  void _stepDate(int days) {
+    setState(() => _selectedDate = _selectedDate.add(Duration(days: days)));
+  }
+
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime(2024),
+      lastDate: DateTime(2027),
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme: const ColorScheme.light(
+            primary: StationColors.primary,
+            onPrimary: Colors.white,
+            onSurface: StationColors.textDark,
+          ),
+        ),
+        child: child!,
+      ),
+    );
+    if (picked != null) setState(() => _selectedDate = picked);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -47,12 +79,33 @@ class _ShiftReviewScreenState extends State<ShiftReviewScreen> {
                 ),
                 child: Row(
                   children: [
-                    IconButton(icon: const Icon(Icons.chevron_left, size: 20), onPressed: () {}),
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 8),
-                      child: Text('9 Oct 2026', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    IconButton(
+                      icon: const Icon(Icons.chevron_left, size: 20),
+                      tooltip: 'Previous day',
+                      onPressed: () => _stepDate(-1),
                     ),
-                    IconButton(icon: const Icon(Icons.chevron_right, size: 20), onPressed: () {}),
+                    InkWell(
+                      onTap: _pickDate,
+                      borderRadius: BorderRadius.circular(4),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.calendar_month, size: 16, color: StationColors.primary),
+                            const SizedBox(width: 6),
+                            Text(
+                              _formatDate(_selectedDate),
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.chevron_right, size: 20),
+                      tooltip: 'Next day',
+                      onPressed: () => _stepDate(1),
+                    ),
                   ],
                 ),
               ),
