@@ -17,8 +17,8 @@ class ShiftReviewScreen extends StatefulWidget {
 }
 
 class _ShiftReviewScreenState extends State<ShiftReviewScreen> {
-  int _selectedShiftIdx = 1; // Default: Evening Srikant (index 1)
-  DateTime _selectedDate = DateTime(2026, 10, 9);
+  int _selectedShiftIdx = 0;
+  DateTime _selectedDate = DateTime.now();
 
   static const List<String> _months = [
     'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
@@ -146,9 +146,9 @@ class _ShiftReviewScreenState extends State<ShiftReviewScreen> {
                     Padding(padding: EdgeInsets.all(12), child: SizedBox()),
                   ],
                 ),
-                ...List.generate(shifts.length - 1, (i) {
-                  final s = shifts[i + 1]; // Skip active morning, show historical 9 Oct shifts
-                  bool isSelected = (i + 1) == _selectedShiftIdx;
+                ...List.generate(shifts.length, (i) {
+                  final s = shifts[i];
+                  bool isSelected = i == _selectedShiftIdx;
                   return TableRow(
                     decoration: BoxDecoration(
                       color: isSelected ? StationColors.primaryLight.withOpacity(0.06) : Colors.transparent,

@@ -14,7 +14,7 @@ class DailyReportScreen extends StatefulWidget {
 }
 
 class _DailyReportScreenState extends State<DailyReportScreen> {
-  DateTime _selectedDate = DateTime(2026, 10, 9);
+  DateTime _selectedDate = DateTime.now();
   String _selectedShift = 'Evening Shift';
 
   final List<String> _shiftOptions = const [

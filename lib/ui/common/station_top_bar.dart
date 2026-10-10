@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/colors.dart';
 import '../../core/constants/dimensions.dart';
+import '../../core/formatting/date_formatter.dart';
 import '../../l10n/app_strings.dart';
 import '../../models/user_profile.dart';
 import '../../services/station_state_provider.dart';
@@ -58,6 +59,29 @@ class StationTopBar extends StatelessWidget implements PreferredSizeWidget {
         ],
       ),
       actions: [
+        // Live Dynamic IST Date Badge
+        Container(
+          margin: const EdgeInsets.symmetric(vertical: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF3F4F6),
+            borderRadius: BorderRadius.circular(StationDimensions.pillRadius),
+            border: Border.all(color: StationColors.divider),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.today, size: 14, color: StationColors.primary),
+              const SizedBox(width: 5),
+              Text(
+                DateFormatter.formatDisplayDate(DateTime.now()),
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: StationColors.textDark),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 8),
+
         // Language Toggle Pill
         Container(
           margin: const EdgeInsets.symmetric(vertical: 14),

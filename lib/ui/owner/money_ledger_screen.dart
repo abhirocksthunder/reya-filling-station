@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../core/constants/colors.dart';
 import '../../core/constants/dimensions.dart';
 import '../../core/formatting/currency_formatter.dart';
+import '../../core/formatting/date_formatter.dart';
 import '../../l10n/app_strings.dart';
 import '../../services/station_state_provider.dart';
 
@@ -33,7 +34,7 @@ class _MoneyLedgerScreenState extends State<MoneyLedgerScreen> {
             style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: StationColors.textDark),
           ),
           const SizedBox(height: 2),
-          const Text('9 Oct 2026 • Illustrated from notebook', style: TextStyle(fontSize: 14, color: StationColors.textMedium)),
+          Text('${DateFormatter.formatDisplayDate(DateTime.now())} • Forecourt Ledger', style: const TextStyle(fontSize: 14, color: StationColors.textMedium)),
           const SizedBox(height: 20),
 
           // Sub-tabs row
@@ -70,7 +71,7 @@ class _MoneyLedgerScreenState extends State<MoneyLedgerScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Money summary (9 Oct 2026)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    Text('Money summary (${DateFormatter.formatDisplayDate(DateTime.now())})', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                     const SizedBox(height: 16),
                     _buildLedgerRow('Recorded sales', '₹98,146', isBold: true),
                     const Divider(height: 20),
@@ -214,14 +215,14 @@ class _MoneyLedgerScreenState extends State<MoneyLedgerScreen> {
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(color: StationColors.warningBorder),
                     ),
-                    child: const Column(
+                    child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Original Record from 9 Oct Ledger:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: StationColors.warningAmber)),
-                        SizedBox(height: 4),
-                        Text('• Description: Other cash debit', style: TextStyle(fontSize: 12)),
-                        Text('• Amount: ₹17,373 (1737300 paise)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                        Text('• Shift: Evening Shift (Recorded by Srikanth)', style: TextStyle(fontSize: 12)),
+                        Text('Original Ledger Record (${DateFormatter.formatDisplayDate(DateTime.now())}):', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: StationColors.warningAmber)),
+                        const SizedBox(height: 4),
+                        const Text('• Description: Other cash debit', style: TextStyle(fontSize: 12)),
+                        const Text('• Amount: ₹17,373 (1737300 paise)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                        const Text('• Shift: Evening Shift (Recorded by Srikanth)', style: TextStyle(fontSize: 12)),
                       ],
                     ),
                   ),

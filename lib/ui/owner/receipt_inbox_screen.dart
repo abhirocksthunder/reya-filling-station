@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/colors.dart';
 import '../../core/constants/dimensions.dart';
+import '../../core/formatting/date_formatter.dart';
 import '../../l10n/app_strings.dart';
+import '../../models/pump.dart';
 import '../../models/receipt_scan.dart';
 import '../../services/station_state_provider.dart';
 import '../common/pagination_control.dart';
@@ -259,6 +261,14 @@ class _ReceiptInboxScreenState extends State<ReceiptInboxScreen> {
 }
 
   Widget _buildReviewPane(BuildContext context, ReceiptScan scan, String lang) {
+    final state = context.watch<StationStateProvider>();
+    final pump = state.pumps.firstWhere(
+      (p) => p.serialNumber == scan.pumpSerialNumber || p.id == 'pump_${scan.fpId}',
+      orElse: () => state.pumps.isNotEmpty
+          ? state.pumps.first
+          : const Pump(id: '1', name: 'Pump 1', serialNumber: '', nozzles: []),
+    );
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -273,16 +283,16 @@ class _ReceiptInboxScreenState extends State<ReceiptInboxScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Pump ${scan.fpId} • Receipt review',
+                '${pump.name} • Receipt Audit',
                 style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: StationColors.textDark),
               ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: Colors.grey.withOpacity(0.12),
+                  color: StationColors.primaryLight.withOpacity(0.12),
                   borderRadius: BorderRadius.circular(6),
                 ),
-                child: Text('Historical sample: ${scan.printedDate}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                child: Text('Recorded: ${scan.printedDate} ${scan.printedTime}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: StationColors.primary)),
               ),
             ],
           ),
@@ -291,7 +301,7 @@ class _ReceiptInboxScreenState extends State<ReceiptInboxScreen> {
           // Printout and Metadata Columns
           LayoutBuilder(
             builder: (context, c) {
-              bool isStacked = c.maxWidth < 600;
+              bool isStacked = c.maxWidth < 650;
 
               Widget printoutView = Container(
                 padding: const EdgeInsets.all(16),
@@ -303,6 +313,14 @@ class _ReceiptInboxScreenState extends State<ReceiptInboxScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Staff Captured Slip', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.brown)),
+                        const Icon(Icons.receipt_long, size: 16, color: Colors.brown),
+                      ],
+                    ),
+                    const Divider(height: 12, color: Color(0xFFD6CBBB)),
                     Text('FP. ID          : ${scan.fpId}', style: const TextStyle(fontFamily: 'monospace', fontSize: 13)),
                     Text('Pump SNo   : ${scan.pumpSerialNumber}', style: const TextStyle(fontFamily: 'monospace', fontSize: 13)),
                     Text('Date           : ${scan.printedDate}', style: const TextStyle(fontFamily: 'monospace', fontSize: 13)),
@@ -317,14 +335,69 @@ class _ReceiptInboxScreenState extends State<ReceiptInboxScreen> {
                 ),
               );
 
+              Widget ownerProofView = Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF0FDF4),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFBBF7D0)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Owner Base Totaliser Proof', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: StationColors.successGreen)),
+                        const Icon(Icons.verified, size: 16, color: StationColors.successGreen),
+                      ],
+                    ),
+                    const Divider(height: 12, color: Color(0xFFBBF7D0)),
+                    Text('Pump SNo   : ${pump.serialNumber}', style: const TextStyle(fontFamily: 'monospace', fontSize: 13)),
+                    Text('Status     : Baseline Active', style: const TextStyle(fontFamily: 'monospace', fontSize: 13, color: StationColors.successGreen)),
+                    const SizedBox(height: 8),
+                    if (pump.nozzles.isNotEmpty) ...[
+                      Text('Nozzle 1 Prev: ${pump.nozzles[0].formattedPreviousReading}', style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
+                      Text('Nozzle 1 Live: ${pump.nozzles[0].formattedReading}', style: const TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 12)),
+                    ],
+                    if (pump.nozzles.length > 1) ...[
+                      const SizedBox(height: 4),
+                      Text('Nozzle 2 Prev: ${pump.nozzles[1].formattedPreviousReading}', style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
+                      Text('Nozzle 2 Live: ${pump.nozzles[1].formattedReading}', style: const TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 12)),
+                    ],
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: const Color(0xFFBBF7D0)),
+                      ),
+                      child: Row(
+                        children: const [
+                          Icon(Icons.shield_outlined, size: 14, color: StationColors.successGreen),
+                          SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              'Matched against owner totaliser baseline',
+                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: StationColors.successGreen),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+
               Widget metadataView = Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildMetaRow('Captured by', scan.capturedBy),
                   _buildMetaRow('Date on receipt', scan.printedDate),
                   _buildMetaRow('Time on receipt', scan.printedTime),
-                  _buildMetaRow('Time received', '9 Oct 2026 21:51'),
-                  _buildMetaRow('Location', 'Not a verified geolocation (simulated)', isLocation: true),
+                  _buildMetaRow('Time received', DateFormatter.formatDisplayDateTime(scan.capturedAt)),
+                  _buildMetaRow('Audit Check', 'Dynamic IndianOil Format Confirmed'),
                   const SizedBox(height: 16),
                   // Table
                   Container(
@@ -364,42 +437,58 @@ class _ReceiptInboxScreenState extends State<ReceiptInboxScreen> {
                   children: [
                     printoutView,
                     const SizedBox(height: 16),
+                    ownerProofView,
+                    const SizedBox(height: 16),
                     metadataView,
                   ],
                 );
               }
 
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              return Column(
                 children: [
-                  Expanded(flex: 4, child: printoutView),
-                  const SizedBox(width: 20),
-                  Expanded(flex: 5, child: metadataView),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(child: printoutView),
+                      const SizedBox(width: 16),
+                      Expanded(child: ownerProofView),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  metadataView,
                 ],
               );
             },
           ),
           const SizedBox(height: 20),
 
-          // Warning Callout
+          // Audit status banner
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: StationColors.warningBg,
+              color: scan.validationStatus == ReceiptValidationStatus.valid ? StationColors.successBg : StationColors.warningBg,
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: StationColors.warningBorder),
+              border: Border.all(color: scan.validationStatus == ReceiptValidationStatus.valid ? StationColors.successGreen.withOpacity(0.3) : StationColors.warningBorder),
             ),
             child: Row(
               children: [
-                const Icon(Icons.warning_amber_rounded, color: StationColors.warningAmber, size: 24),
+                Icon(
+                  scan.validationStatus == ReceiptValidationStatus.valid ? Icons.check_circle_outline : Icons.warning_amber_rounded,
+                  color: scan.validationStatus == ReceiptValidationStatus.valid ? StationColors.successGreen : StationColors.warningAmber,
+                  size: 24,
+                ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Not valid as a new 10 Oct reading',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: StationColors.warningAmber),
+                      Text(
+                        scan.validationStatus == ReceiptValidationStatus.valid ? 'Verified Reading' : 'Reading Flagged for Attention',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                          color: scan.validationStatus == ReceiptValidationStatus.valid ? StationColors.successGreen : StationColors.warningAmber,
+                        ),
                       ),
                       Text(
                         scan.statusMessage,

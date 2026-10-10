@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../core/constants/colors.dart';
 import '../../core/constants/dimensions.dart';
 import '../../core/formatting/currency_formatter.dart';
+import '../../core/formatting/date_formatter.dart';
 import '../../l10n/app_strings.dart';
 import '../../services/station_state_provider.dart';
 
@@ -220,15 +221,15 @@ class _CloseShiftScreenState extends State<CloseShiftScreen> {
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(color: StationColors.divider),
                       ),
-                      child: const Row(
+                      child: Row(
                         children: [
                           Expanded(
                             child: Text(
-                              '9 Oct • 10:00 pm',
-                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                              DateFormatter.formatDisplayDateTime(DateTime.now()),
+                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
                             ),
                           ),
-                          Icon(Icons.access_time, size: 16, color: Colors.grey),
+                          const Icon(Icons.access_time, size: 16, color: Colors.grey),
                         ],
                       ),
                     ),

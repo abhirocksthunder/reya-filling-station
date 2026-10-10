@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../core/constants/colors.dart';
 import '../../core/constants/dimensions.dart';
 import '../../core/formatting/currency_formatter.dart';
+import '../../core/formatting/date_formatter.dart';
 import '../../l10n/app_strings.dart';
 import '../../models/transaction_entry.dart';
 import '../../services/station_state_provider.dart';
@@ -18,14 +19,20 @@ class _MoneyEntriesScreenState extends State<MoneyEntriesScreen> {
   EntryDirection _direction = EntryDirection.received;
   EntryCategory _selectedCategory = EntryCategory.phonePe;
 
-  final TextEditingController _amountController = TextEditingController(text: '2,500');
-  final TextEditingController _phoneController = TextEditingController(text: '9848012432');
-  final TextEditingController _timeController = TextEditingController(text: '12:15 pm');
-  final TextEditingController _refController = TextEditingController(text: 'Customer UPI');
+  final TextEditingController _amountController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
+  late final TextEditingController _timeController;
+  final TextEditingController _refController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _timeController = TextEditingController(text: DateFormatter.formatDisplayTime(DateTime.now()));
+  }
 
   @override
   void dispose() {
-    _amountController.dispose;
+    _amountController.dispose();
     _phoneController.dispose();
     _timeController.dispose();
     _refController.dispose();

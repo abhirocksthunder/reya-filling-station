@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/colors.dart';
 import '../../core/constants/dimensions.dart';
+import '../../core/formatting/date_formatter.dart';
 import '../../l10n/app_strings.dart';
 import '../../models/pump.dart';
 import '../../services/station_state_provider.dart';
@@ -235,9 +236,36 @@ class _PumpSetupScreenState extends State<PumpSetupScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Reference receipt', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                    const SizedBox(height: 12),
-                    // Printout preview with IndianOil branding
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Base Totaliser Proof', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: StationColors.successBg,
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: StationColors.successGreen.withOpacity(0.3)),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.verified, size: 14, color: StationColors.successGreen),
+                              SizedBox(width: 4),
+                              Text('Owner Verified Base', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: StationColors.successGreen)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    const Text(
+                      'Authoritative baseline totaliser image used to validate staff receipt uploads & prevent erroneous entries.',
+                      style: TextStyle(fontSize: 12, color: StationColors.textLight),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Printout preview with IndianOil branding & dynamic values
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(16),
@@ -246,10 +274,10 @@ class _PumpSetupScreenState extends State<PumpSetupScreen> {
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(color: const Color(0xFFE2D9C8)),
                       ),
-                      child: const Column(
+                      child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Center(
+                          const Center(
                             child: Column(
                               children: [
                                 Icon(Icons.circle, color: Colors.orange, size: 28),
@@ -257,23 +285,27 @@ class _PumpSetupScreenState extends State<PumpSetupScreen> {
                               ],
                             ),
                           ),
-                          SizedBox(height: 12),
-                          Text('FP. ID          : 1', style: TextStyle(fontFamily: 'monospace', fontSize: 12)),
-                          Text('Pump SNo   : 202501001272', style: TextStyle(fontFamily: 'monospace', fontSize: 12)),
-                          Text('Date           : 09/10/2026', style: TextStyle(fontFamily: 'monospace', fontSize: 12)),
-                          Text('Time           : 21:50:29', style: TextStyle(fontFamily: 'monospace', fontSize: 12)),
-                          Divider(height: 12),
-                          Text('Nozzle No1', style: TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 12)),
-                          Text('CumVolume: 169923.720', style: TextStyle(fontFamily: 'monospace', fontSize: 12)),
-                          SizedBox(height: 6),
-                          Text('Nozzle No2', style: TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 12)),
-                          Text('CumVolume: 274487.190', style: TextStyle(fontFamily: 'monospace', fontSize: 12)),
+                          const SizedBox(height: 12),
+                          Text('FP. ID          : ${pump.id.replaceAll('pump_', '')}', style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
+                          Text('Pump SNo   : ${pump.serialNumber}', style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
+                          Text('Date           : ${DateFormatter.formatDisplayDate(DateTime.now())}', style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
+                          Text('Time           : ${DateFormatter.formatDisplayTime(DateTime.now())}', style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
+                          const Divider(height: 12),
+                          if (pump.nozzles.isNotEmpty) ...[
+                            Text('Nozzle No1 (${pump.nozzles[0].fuelType})', style: const TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 12)),
+                            Text('CumVolume: ${pump.nozzles[0].formattedReading.replaceAll(' L', '')}', style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
+                          ],
+                          if (pump.nozzles.length > 1) ...[
+                            const SizedBox(height: 6),
+                            Text('Nozzle No2 (${pump.nozzles[1].fuelType})', style: const TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 12)),
+                            Text('CumVolume: ${pump.nozzles[1].formattedReading.replaceAll(' L', '')}', style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
+                          ],
                         ],
                       ),
                     ),
                     const SizedBox(height: 16),
-                    const Text('Receipt template', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                    const Text('Template v1', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                    const Text('Receipt template & mapping', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                    const Text('IndianOil Automation v1', style: TextStyle(fontSize: 12, color: Colors.grey)),
                     const SizedBox(height: 10),
                     const Text('Field mapping (from receipt)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 4),
@@ -284,13 +316,15 @@ class _PumpSetupScreenState extends State<PumpSetupScreen> {
                     const SizedBox(height: 16),
                     SizedBox(
                       width: double.infinity,
-                      child: OutlinedButton.icon(
-                        icon: const Icon(Icons.upload_file, size: 18),
-                        label: const Text('Upload reference receipt'),
-                        style: OutlinedButton.styleFrom(
+                      child: ElevatedButton.icon(
+                        icon: const Icon(Icons.add_photo_alternate, size: 18, color: Colors.white),
+                        label: const Text('Upload Base Totaliser Proof Image', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: StationColors.primary,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                         ),
-                        onPressed: () {},
+                        onPressed: () => _showUploadBaseProofDialog(context, state, pump),
                       ),
                     ),
                   ],
@@ -314,6 +348,76 @@ class _PumpSetupScreenState extends State<PumpSetupScreen> {
                   const SizedBox(width: 20),
                   Expanded(flex: 5, child: rightReferenceCol),
                 ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showUploadBaseProofDialog(BuildContext context, StationStateProvider state, Pump pump) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            const Icon(Icons.verified_user_rounded, color: StationColors.primary),
+            const SizedBox(width: 10),
+            Text('Base Totaliser Proof: ${pump.name}'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Upload or select an authoritative totaliser photo. Shift staff uploads will be validated against this baseline to eliminate fraudulent or incorrect updates.',
+              style: TextStyle(fontSize: 13, color: StationColors.textMedium),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFBF8F1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFE2D9C8)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.image, size: 36, color: StationColors.primary),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Current baseline: ${pump.referenceReceiptAsset ?? "assets/images/media_1791616403909.jpg"}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                        const Text('IndianOil Pump SNo: 202501001272', style: TextStyle(fontSize: 11, color: Colors.black54)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton.icon(
+            icon: const Icon(Icons.cloud_upload, size: 16, color: Colors.white),
+            label: const Text('Save Proof Image', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            style: ElevatedButton.styleFrom(backgroundColor: StationColors.successGreen),
+            onPressed: () {
+              state.updatePumpBaseTotaliserImage(pump.id, 'assets/images/media_1791616403909.jpg');
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Authoritative base totaliser proof updated for ${pump.name}!'),
+                  backgroundColor: StationColors.successGreen,
+                ),
               );
             },
           ),

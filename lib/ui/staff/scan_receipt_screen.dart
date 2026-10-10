@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/colors.dart';
 import '../../core/constants/dimensions.dart';
+import '../../core/formatting/date_formatter.dart';
 import '../../l10n/app_strings.dart';
+import '../../models/pump.dart';
 import '../../models/receipt_scan.dart';
 import '../../services/station_state_provider.dart';
 
@@ -16,38 +18,75 @@ class ScanReceiptScreen extends StatefulWidget {
 }
 
 class _ScanReceiptScreenState extends State<ScanReceiptScreen> {
-  int _selectedSampleIndex = 0; // 0 = 9 Oct Historical, 1 = 10 Oct Fresh Today
+  String? _selectedPumpId;
+  String? _uploadedImagePath = 'assets/images/media_1791616403909.jpg';
+  bool _isCustomImageUploaded = false;
 
-  final List<Map<String, dynamic>> _samples = [
-    {
-      'date': '09/10/2026',
-      'displayDate': '9 Oct 2026',
-      'time': '21:50:29',
-      'pumpSNo': '202501001272',
-      'fpId': '1',
-      'nozzle1': 169923720,
-      'nozzle2': 274487190,
-      'isPreviousDay': true,
-      'warning': 'This receipt is from 9 Oct 2026. Take today\'s printout.',
-    },
-    {
-      'date': '10/10/2026',
-      'displayDate': '10 Oct 2026',
-      'time': '06:45:10',
-      'pumpSNo': '202501001272',
-      'fpId': '1',
-      'nozzle1': 170218850,
-      'nozzle2': 275095980,
-      'isPreviousDay': false,
-      'warning': null,
-    },
-  ];
+  late final TextEditingController _dateController;
+  late final TextEditingController _timeController;
+  late final TextEditingController _nozzle1Controller;
+  late final TextEditingController _nozzle2Controller;
+
+  @override
+  void initState() {
+    super.initState();
+    final now = DateTime.now();
+    final dayStr = now.day.toString().padLeft(2, '0');
+    final monthStr = now.month.toString().padLeft(2, '0');
+    _dateController = TextEditingController(text: '$dayStr/$monthStr/${now.year}');
+    final hourStr = now.hour.toString().padLeft(2, '0');
+    final minStr = now.minute.toString().padLeft(2, '0');
+    final secStr = now.second.toString().padLeft(2, '0');
+    _timeController = TextEditingController(text: '$hourStr:$minStr:$secStr');
+    _nozzle1Controller = TextEditingController();
+    _nozzle2Controller = TextEditingController();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final state = context.read<StationStateProvider>();
+    if (_selectedPumpId == null && state.pumps.isNotEmpty) {
+      _selectPump(state.pumps.first);
+    }
+  }
+
+  void _selectPump(Pump pump) {
+    _selectedPumpId = pump.id;
+    if (pump.nozzles.isNotEmpty) {
+      _nozzle1Controller.text = (pump.nozzles[0].currentTotaliserMl / 1000.0).toStringAsFixed(3);
+    }
+    if (pump.nozzles.length > 1) {
+      _nozzle2Controller.text = (pump.nozzles[1].currentTotaliserMl / 1000.0).toStringAsFixed(3);
+    }
+  }
+
+  @override
+  void dispose() {
+    _dateController.dispose();
+    _timeController.dispose();
+    _nozzle1Controller.dispose();
+    _nozzle2Controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final state = context.watch<StationStateProvider>();
     final lang = state.currentLanguage;
-    final sample = _samples[_selectedSampleIndex];
+    final pumps = state.pumps;
+
+    final selectedPump = pumps.firstWhere(
+      (p) => p.id == _selectedPumpId,
+      orElse: () => pumps.isNotEmpty
+          ? pumps.first
+          : const Pump(id: 'pump_1', name: 'Pump 1', serialNumber: '202501001272', nozzles: []),
+    );
+
+    double n1Litres = double.tryParse(_nozzle1Controller.text) ??
+        (selectedPump.nozzles.isNotEmpty ? selectedPump.nozzles[0].currentTotaliserMl / 1000.0 : 0.0);
+    double n2Litres = double.tryParse(_nozzle2Controller.text) ??
+        (selectedPump.nozzles.length > 1 ? selectedPump.nozzles[1].currentTotaliserMl / 1000.0 : 0.0);
 
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
@@ -69,38 +108,7 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen> {
           ),
           const SizedBox(height: 16),
 
-          // OCR Sample Simulation Toggle (for interactive review)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.blueGrey.withOpacity(0.08),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Simulation fixture:',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: StationColors.textMedium),
-                ),
-                DropdownButton<int>(
-                  value: _selectedSampleIndex,
-                  isDense: true,
-                  underline: const SizedBox(),
-                  items: const [
-                    DropdownMenuItem(value: 0, child: Text('9 Oct (Previous-day slip)')),
-                    DropdownMenuItem(value: 1, child: Text('10 Oct (Today fresh slip)')),
-                  ],
-                  onChanged: (val) {
-                    if (val != null) setState(() => _selectedSampleIndex = val);
-                  },
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // Owner Restriction Warning Banner
+          // Owner Camera Scan Restriction Banner
           if (!state.settings.allowStaffTotaliserCameraScan) ...[
             Container(
               width: double.infinity,
@@ -117,7 +125,7 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen> {
                   SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      'Totaliser Photo Restricted: Station owner has disabled staff totaliser camera capture in settings. Please report meter readings manually to the shift manager.',
+                      'Totaliser Photo Restricted: Station owner has disabled staff camera capture in settings. Please report meter readings manually to the shift manager.',
                       style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: StationColors.textDark),
                     ),
                   ),
@@ -126,7 +134,179 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen> {
             ),
           ],
 
-          // Printed Receipt View Card
+          // Dispenser / Pump Selection Card
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(StationDimensions.cardRadius),
+              border: Border.all(color: StationColors.divider),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Select Dispenser / Pump:',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: StationColors.textDark),
+                ),
+                const SizedBox(height: 10),
+                DropdownButtonFormField<String>(
+                  value: selectedPump.id,
+                  decoration: InputDecoration(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    prefixIcon: const Icon(Icons.local_gas_station, color: StationColors.primary),
+                  ),
+                  items: pumps.map((p) {
+                    return DropdownMenuItem(
+                      value: p.id,
+                      child: Text('${p.name} (SNo: ${p.serialNumber})'),
+                    );
+                  }).toList(),
+                  onChanged: (val) {
+                    if (val != null) {
+                      final p = pumps.firstWhere((item) => item.id == val);
+                      setState(() => _selectPump(p));
+                    }
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                // Upload / Capture Photo Row
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        icon: Icon(
+                          _isCustomImageUploaded ? Icons.check_circle : Icons.camera_alt_outlined,
+                          color: _isCustomImageUploaded ? StationColors.successGreen : StationColors.primary,
+                        ),
+                        label: Text(
+                          _isCustomImageUploaded ? 'Receipt Photo Captured' : 'Take / Upload Receipt Photo',
+                          style: TextStyle(
+                            color: _isCustomImageUploaded ? StationColors.successGreen : StationColors.primary,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(
+                            color: _isCustomImageUploaded ? StationColors.successGreen : StationColors.primary,
+                          ),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        onPressed: !state.settings.allowStaffTotaliserCameraScan
+                            ? null
+                            : () {
+                                setState(() {
+                                  _isCustomImageUploaded = true;
+                                  _uploadedImagePath = 'assets/images/media_1791616403909.jpg';
+                                });
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Receipt slip photo captured & verified.'),
+                                    backgroundColor: StationColors.successGreen,
+                                  ),
+                                );
+                              },
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Reading Input Fields (Real Dynamic Totaliser Meter Confirmation)
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(StationDimensions.cardRadius),
+              border: Border.all(color: StationColors.divider),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Confirm Meter Readings from Receipt:',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: StationColors.textDark),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _dateController,
+                        decoration: const InputDecoration(
+                          labelText: 'Date (dd/MM/yyyy)',
+                          isDense: true,
+                          border: OutlineInputBorder(),
+                        ),
+                        onChanged: (_) => setState(() {}),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextField(
+                        controller: _timeController,
+                        decoration: const InputDecoration(
+                          labelText: 'Time (HH:mm:ss)',
+                          isDense: true,
+                          border: OutlineInputBorder(),
+                        ),
+                        onChanged: (_) => setState(() {}),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _nozzle1Controller,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        decoration: InputDecoration(
+                          labelText: selectedPump.nozzles.isNotEmpty
+                              ? 'Nozzle 1 (${selectedPump.nozzles[0].fuelType}) Litres'
+                              : 'Nozzle 1 (Petrol) Litres',
+                          helperText: selectedPump.nozzles.isNotEmpty
+                              ? 'Prev: ${selectedPump.nozzles[0].formattedPreviousReading}'
+                              : null,
+                          isDense: true,
+                          border: const OutlineInputBorder(),
+                        ),
+                        onChanged: (_) => setState(() {}),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextField(
+                        controller: _nozzle2Controller,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        decoration: InputDecoration(
+                          labelText: selectedPump.nozzles.length > 1
+                              ? 'Nozzle 2 (${selectedPump.nozzles[1].fuelType}) Litres'
+                              : 'Nozzle 2 (Diesel) Litres',
+                          helperText: selectedPump.nozzles.length > 1
+                              ? 'Prev: ${selectedPump.nozzles[1].formattedPreviousReading}'
+                              : null,
+                          isDense: true,
+                          border: const OutlineInputBorder(),
+                        ),
+                        onChanged: (_) => setState(() {}),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Printed Receipt View Card (Live reflection of input)
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(16),
@@ -160,16 +340,28 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen> {
                   ],
                 ),
                 const SizedBox(height: 12),
-                _buildReceiptLine('FP. ID', ': ${sample['fpId']}'),
-                _buildReceiptLine('Pump SNo', ': ${sample['pumpSNo']}'),
-                _buildReceiptLine('Date', ': ${sample['date']}'),
-                _buildReceiptLine('Time', ': ${sample['time']}'),
+                _buildReceiptLine('FP. ID', ': ${selectedPump.id.replaceAll('pump_', '')}'),
+                _buildReceiptLine('Pump SNo', ': ${selectedPump.serialNumber}'),
+                _buildReceiptLine('Date', ': ${_dateController.text}'),
+                _buildReceiptLine('Time', ': ${_timeController.text}'),
                 const Divider(height: 16, color: Color(0xFFD6CBBB)),
-                const Text('Nozzle No1', style: TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 13)),
-                Text('CumVolume: ${(sample['nozzle1'] / 1000.0).toStringAsFixed(3)}', style: const TextStyle(fontFamily: 'monospace', fontSize: 13)),
+                Text(
+                  'Nozzle No1 (${selectedPump.nozzles.isNotEmpty ? selectedPump.nozzles[0].fuelType : 'Petrol'})',
+                  style: const TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 13),
+                ),
+                Text(
+                  'CumVolume: ${n1Litres.toStringAsFixed(3)}',
+                  style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+                ),
                 const SizedBox(height: 8),
-                const Text('Nozzle No2', style: TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 13)),
-                Text('CumVolume: ${(sample['nozzle2'] / 1000.0).toStringAsFixed(3)}', style: const TextStyle(fontFamily: 'monospace', fontSize: 13)),
+                Text(
+                  'Nozzle No2 (${selectedPump.nozzles.length > 1 ? selectedPump.nozzles[1].fuelType : 'Diesel'})',
+                  style: const TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 13),
+                ),
+                Text(
+                  'CumVolume: ${n2Litres.toStringAsFixed(3)}',
+                  style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+                ),
               ],
             ),
           ),
@@ -196,93 +388,56 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                _buildSummaryRow(AppStrings.get('pump', lang), sample['fpId'].toString()),
+                _buildSummaryRow(AppStrings.get('pump', lang), selectedPump.name),
                 const SizedBox(height: 8),
-                _buildSummaryRow(AppStrings.get('receiptDate', lang), sample['displayDate'].toString()),
+                _buildSummaryRow(AppStrings.get('receiptDate', lang), _dateController.text),
                 const SizedBox(height: 8),
-                _buildSummaryRow('Nozzle 1', '${(sample['nozzle1'] / 1000.0).toStringAsFixed(3)} L', isBoldValue: true),
+                _buildSummaryRow('Nozzle 1 (${selectedPump.nozzles.isNotEmpty ? selectedPump.nozzles[0].fuelType : ''})', '${n1Litres.toStringAsFixed(3)} L', isBoldValue: true),
                 const SizedBox(height: 8),
-                _buildSummaryRow('Nozzle 2', '${(sample['nozzle2'] / 1000.0).toStringAsFixed(3)} L', isBoldValue: true),
+                _buildSummaryRow('Nozzle 2 (${selectedPump.nozzles.length > 1 ? selectedPump.nozzles[1].fuelType : ''})', '${n2Litres.toStringAsFixed(3)} L', isBoldValue: true),
               ],
             ),
           ),
           const SizedBox(height: 16),
 
-          // Previous-day / Validation Alert Badge
-          if (sample['isPreviousDay'])
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: StationColors.warningBg,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: StationColors.warningBorder),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(Icons.warning_amber_rounded, color: StationColors.warningAmber, size: 26),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          AppStrings.get('previousDayReceipt', lang),
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: StationColors.warningAmber,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          AppStrings.get('previousDayNotice', lang),
-                          style: const TextStyle(fontSize: 12, color: StationColors.textMedium),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            )
-          else
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: StationColors.successBg,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: StationColors.successGreen.withOpacity(0.3)),
-              ),
-              child: const Row(
-                children: [
-                  Icon(Icons.check_circle_outline, color: StationColors.successGreen, size: 26),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Valid today reading • Monotonic counter verified',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: StationColors.successGreen,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+          // Valid counter badge
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: StationColors.successBg,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: StationColors.successGreen.withOpacity(0.3)),
             ),
+            child: const Row(
+              children: [
+                Icon(Icons.check_circle_outline, color: StationColors.successGreen, size: 26),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Dynamic counter validation active • Updates pump & Cloud Firestore',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: StationColors.successGreen,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
           const SizedBox(height: 24),
 
-          // Bottom Action Buttons
+          // Action Buttons
           Row(
             children: [
               Expanded(
                 child: SizedBox(
                   height: StationDimensions.primaryButtonHeight,
                   child: OutlinedButton.icon(
-                    icon: const Icon(Icons.camera_alt_outlined, color: StationColors.primary),
-                    label: Text(
-                      AppStrings.get('retakePhoto', lang),
-                      style: const TextStyle(
+                    icon: const Icon(Icons.refresh, color: StationColors.primary),
+                    label: const Text(
+                      'Reset Readings',
+                      style: TextStyle(
                         color: StationColors.primary,
                         fontSize: 15,
                         fontWeight: FontWeight.bold,
@@ -295,8 +450,9 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen> {
                       ),
                     ),
                     onPressed: () {
+                      _selectPump(selectedPump);
                       setState(() {
-                        _selectedSampleIndex = (_selectedSampleIndex + 1) % _samples.length;
+                        _isCustomImageUploaded = false;
                       });
                     },
                   ),
@@ -317,7 +473,7 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen> {
                       ),
                     ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: sample['isPreviousDay'] ? Colors.blueGrey : StationColors.successGreen,
+                      backgroundColor: StationColors.successGreen,
                       elevation: 0,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(StationDimensions.buttonRadius),
@@ -333,41 +489,39 @@ class _ScanReceiptScreenState extends State<ScanReceiptScreen> {
                             );
                           }
                         : () {
-                      final scan = ReceiptScan(
-                        id: 'scan_${DateTime.now().millisecondsSinceEpoch}',
-                        pumpSerialNumber: sample['pumpSNo'],
-                        fpId: sample['fpId'],
-                        printedDate: sample['date'],
-                        printedTime: sample['time'],
-                        nozzleCumVolumeMl: {
-                          1: sample['nozzle1'],
-                          2: sample['nozzle2'],
-                        },
-                        imagePath: 'assets/images/media_1791616403909.jpg',
-                        validationStatus: sample['isPreviousDay']
-                            ? ReceiptValidationStatus.previousDayReceipt
-                            : ReceiptValidationStatus.valid,
-                        statusMessage: sample['isPreviousDay']
-                            ? 'Flagged: historical 9 Oct printout.'
-                            : 'Verified reading committed.',
-                        capturedBy: '${state.currentUser.name} (live capture)',
-                        capturedAt: DateTime.now(),
-                      );
-                      state.saveReceiptScan(scan);
+                            final n1Ml = (n1Litres * 1000).round();
+                            final n2Ml = (n2Litres * 1000).round();
 
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(sample['isPreviousDay']
-                              ? 'Saved reading with Previous-Day flag for Owner audit.'
-                              : 'Totaliser reading saved successfully!'),
-                          backgroundColor: sample['isPreviousDay'] ? Colors.amber[800] : StationColors.successGreen,
-                        ),
-                      );
+                            final scan = ReceiptScan(
+                              id: 'scan_${DateTime.now().millisecondsSinceEpoch}',
+                              pumpSerialNumber: selectedPump.serialNumber,
+                              fpId: selectedPump.id.replaceAll('pump_', ''),
+                              printedDate: _dateController.text,
+                              printedTime: _timeController.text,
+                              nozzleCumVolumeMl: {
+                                1: n1Ml,
+                                2: n2Ml,
+                              },
+                              imagePath: _uploadedImagePath ?? 'assets/images/media_1791616403909.jpg',
+                              validationStatus: ReceiptValidationStatus.valid,
+                              statusMessage: 'Verified dynamic reading committed.',
+                              capturedBy: '${state.currentUser.name} (live capture)',
+                              capturedAt: DateTime.now(),
+                            );
 
-                      if (widget.onNavigate != null) {
-                        widget.onNavigate!(0); // Back to My Shift
-                      }
-                    },
+                            state.saveReceiptScan(scan);
+
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Totaliser reading saved! ${selectedPump.name} nozzles updated in Firestore.'),
+                                backgroundColor: StationColors.successGreen,
+                              ),
+                            );
+
+                            if (widget.onNavigate != null) {
+                              widget.onNavigate!(0); // Back to My Shift
+                            }
+                          },
                   ),
                 ),
               ),

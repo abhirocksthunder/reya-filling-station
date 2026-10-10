@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../core/constants/colors.dart';
 import '../../core/constants/dimensions.dart';
 import '../../core/formatting/currency_formatter.dart';
+import '../../core/formatting/date_formatter.dart';
 import '../../core/formatting/volume_formatter.dart';
 import '../../l10n/app_strings.dart';
 import '../../services/station_state_provider.dart';
@@ -204,7 +205,7 @@ class MyShiftScreen extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                '${AppStrings.get('lastRecorded', lang)} • 9 Oct',
+                '${AppStrings.get('lastRecorded', lang)} • ${DateFormatter.formatDisplayDate(DateTime.now())}',
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
@@ -223,29 +224,37 @@ class MyShiftScreen extends StatelessWidget {
           ),
           const SizedBox(height: 12),
 
-          // Nozzle 1 & Nozzle 2 Reading Tiles
+          // Nozzle 1 & Nozzle 2 Reading Tiles (Dynamic from state.pumps)
           Container(
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(StationDimensions.cardRadius),
               border: Border.all(color: StationColors.divider),
             ),
-            child: Column(
-              children: [
-                _buildReadingRow(
-                  label: 'Nozzle 1',
-                  reading: '169,923.720 L',
-                  sub: 'Petrol • Rate ₹117.52',
-                  onTap: () => onTabChange(1),
-                ),
-                const Divider(height: 1, color: StationColors.divider),
-                _buildReadingRow(
-                  label: 'Nozzle 2',
-                  reading: '274,487.190 L',
-                  sub: 'Diesel • Rate ₹105.21',
-                  onTap: () => onTabChange(1),
-                ),
-              ],
+            child: Builder(
+              builder: (context) {
+                final pump = state.pumps.isNotEmpty ? state.pumps.first : null;
+                final n1 = (pump != null && pump.nozzles.isNotEmpty) ? pump.nozzles[0] : null;
+                final n2 = (pump != null && pump.nozzles.length > 1) ? pump.nozzles[1] : null;
+
+                return Column(
+                  children: [
+                    _buildReadingRow(
+                      label: n1 != null ? n1.displayName : 'Nozzle 1',
+                      reading: n1 != null ? n1.formattedReading : '0.000 L',
+                      sub: n1 != null ? '${n1.fuelType} • Rate ${n1.formattedRate}' : 'Petrol',
+                      onTap: () => onTabChange(1),
+                    ),
+                    const Divider(height: 1, color: StationColors.divider),
+                    _buildReadingRow(
+                      label: n2 != null ? n2.displayName : 'Nozzle 2',
+                      reading: n2 != null ? n2.formattedReading : '0.000 L',
+                      sub: n2 != null ? '${n2.fuelType} • Rate ${n2.formattedRate}' : 'Diesel',
+                      onTap: () => onTabChange(1),
+                    ),
+                  ],
+                );
+              },
             ),
           ),
           const SizedBox(height: 24),

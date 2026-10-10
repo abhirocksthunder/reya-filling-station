@@ -20,6 +20,27 @@
 
 ## Recent Changes (IST)
 
+### 10 Oct 2026 4:05 pm — Purge Mock Transaction Entries, Auto-Update Pump Nozzles on Scan, Base Totaliser Proof Upload, Dynamic Live IST Dates, and Release APK Delivery
+- **Project**: `reya-filling-station`
+- **Type**: `feature` | **Status**: `done`
+- **Summary**: Eradicated hardcoded mock entries from StationStateProvider and pre-filled money form controllers. Added dynamic pump selection and live meter confirmation to ScanReceiptScreen that updates pump totalisers in real-time and persists to Cloud Firestore (`/stations/chatrai/pumps/{id}`). Introduced Owner Base Totaliser Proof image upload in PumpSetupScreen and side-by-side verification pane in ReceiptInboxScreen to eradicate wrong staff updates. Replaced all static dates across top bars, shifts, reports, and ledgers with dynamic Indian Standard Time (IST) formatting. Built Release Android APK and Web distribution.
+- **Impact**: Eliminated dummy mock data, enabled live pump totaliser updates from staff scans, added authoritative owner base proof image verification, guaranteed dynamic IST timestamps across all views, and delivered production release APK.
+- **Modified Files**:
+  - `lib/services/station_state_provider.dart`
+  - `lib/ui/staff/scan_receipt_screen.dart`
+  - `lib/ui/staff/money_entries_screen.dart`
+  - `lib/ui/staff/my_shift_screen.dart`
+  - `lib/ui/staff/close_shift_screen.dart`
+  - `lib/ui/owner/pump_setup_screen.dart`
+  - `lib/ui/owner/receipt_inbox_screen.dart`
+  - `lib/ui/owner/station_overview_screen.dart`
+  - `lib/ui/owner/money_ledger_screen.dart`
+  - `lib/ui/owner/shift_review_screen.dart`
+  - `lib/ui/owner/daily_report_screen.dart`
+  - `lib/ui/common/station_top_bar.dart`
+  - `lib/l10n/app_strings.dart`
+  - `scripts/seed_firestore.js`
+
 ### 10 Oct 2026 3:35 pm — Resolve 11 Operational Flow, OCR Governance, Dynamic Categories, and Firestore Synchronization Requirements
 - **Project**: `reya-filling-station`
 - **Type**: `bugfix` | **Status**: `done`

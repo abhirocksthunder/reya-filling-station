@@ -3,7 +3,9 @@ import 'package:provider/provider.dart';
 import '../../core/constants/colors.dart';
 import '../../core/constants/dimensions.dart';
 import '../../core/formatting/currency_formatter.dart';
+import '../../core/formatting/date_formatter.dart';
 import '../../l10n/app_strings.dart';
+import '../../models/shift.dart';
 import '../../services/station_state_provider.dart';
 
 class StationOverviewScreen extends StatelessWidget {
@@ -33,7 +35,7 @@ class StationOverviewScreen extends StatelessWidget {
                     style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: StationColors.textDark),
                   ),
                   const SizedBox(height: 2),
-                  const Text('10 Oct 2026', style: TextStyle(fontSize: 14, color: StationColors.textMedium)),
+                  Text(DateFormatter.formatDisplayDate(DateTime.now()), style: const TextStyle(fontSize: 14, color: StationColors.textMedium)),
                 ],
               ),
             ],
@@ -131,15 +133,20 @@ class StationOverviewScreen extends StatelessWidget {
               },
               children: [
                 _buildTableHeader(['Shift', 'Staff', 'Time', 'Status']),
-                _buildShiftRow('Morning', 'Ravi', '6:00 AM - 2:00 PM', 'In progress', StationColors.successGreen),
-                _buildShiftRow('Evening', 'Srikant', '2:00 PM - 10:00 PM', 'Needs category review', StationColors.warningAmber),
-                _buildShiftRow('Night', 'Kishore', '10:00 PM - 6:00 AM', 'Scheduled', StationColors.textLight),
+                ...state.allShifts.take(3).map((s) {
+                  Color statusColor = s.status == ShiftStatus.inProgress
+                      ? StationColors.successGreen
+                      : s.status == ShiftStatus.needsReview
+                          ? StationColors.warningAmber
+                          : StationColors.textLight;
+                  return _buildShiftRow(s.shiftName, s.staffName, s.timeRange, s.status.displayName, statusColor);
+                }),
               ],
             ),
           ),
           const SizedBox(height: 28),
 
-          // Latest Receipt (historical)
+          // Latest Receipt
           Text(
             AppStrings.get('latestReceipt', lang),
             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: StationColors.textDark),
@@ -156,15 +163,17 @@ class StationOverviewScreen extends StatelessWidget {
               children: [
                 const Icon(Icons.receipt_long, color: StationColors.textMedium, size: 24),
                 const SizedBox(width: 12),
-                const Expanded(
+                Expanded(
                   child: Text(
-                    'Pump 1 • 9 Oct 2026 21:50 • Captured by Ravi',
-                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: StationColors.textDark),
+                    state.receipts.isNotEmpty
+                        ? 'Pump ${state.receipts.first.fpId} • ${state.receipts.first.printedDate} ${state.receipts.first.printedTime} • Captured by ${state.receipts.first.capturedBy}'
+                        : 'No receipts uploaded yet today • Awaiting forecourt staff entries',
+                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: StationColors.textDark),
                   ),
                 ),
                 TextButton(
                   onPressed: () => onNavigate(1), // Receipts tab
-                  child: const Text('View receipt →', style: TextStyle(fontWeight: FontWeight.bold)),
+                  child: const Text('View receipts →', style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
               ],
             ),
