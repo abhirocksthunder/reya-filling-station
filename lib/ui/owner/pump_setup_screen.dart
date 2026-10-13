@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -51,56 +52,66 @@ class _PumpSetupScreenState extends State<PumpSetupScreen> {
 
     final pump = pumps[_selectedPumpIdx.clamp(0, pumps.length - 1)];
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return LayoutBuilder(
+      builder: (context, screenConstraints) {
+        final isMobile = screenConstraints.maxWidth < 600;
+
+        return SingleChildScrollView(
+          padding: EdgeInsets.all(isMobile ? 14 : 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              // Responsive Header
+              Wrap(
+                spacing: 12,
+                runSpacing: 10,
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   Text(
                     AppStrings.get('pumpsAndReceiptSetup', lang),
-                    style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: StationColors.textDark),
+                    style: TextStyle(
+                      fontSize: isMobile ? 22 : 26,
+                      fontWeight: FontWeight.w800,
+                      color: StationColors.textDark,
+                    ),
+                  ),
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.add, size: 18),
+                    label: Text(AppStrings.get('addPump', lang), style: const TextStyle(fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: StationColors.primary,
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size(44, 44),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    onPressed: () => _showAddPumpDialog(context, state),
                   ),
                 ],
               ),
-              ElevatedButton.icon(
-                icon: const Icon(Icons.add, size: 18),
-                label: Text(AppStrings.get('addPump', lang), style: const TextStyle(fontWeight: FontWeight.bold)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: StationColors.primary,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-                onPressed: () => _showAddPumpDialog(context, state),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
+              const SizedBox(height: 18),
 
-          // Pump Selector Tabs
-          Row(
-            children: List.generate(pumps.length, (i) {
-              bool isSelected = i == _selectedPumpIdx;
-              return Padding(
-                padding: const EdgeInsets.only(right: 10),
-                child: ChoiceChip(
-                  label: Text(pumps[i].name, style: TextStyle(fontWeight: FontWeight.bold, color: isSelected ? Colors.white : StationColors.textDark)),
-                  selected: isSelected,
-                  selectedColor: StationColors.primary,
-                  onSelected: (val) {
-                    if (val) setState(() => _selectedPumpIdx = i);
-                  },
+              // Horizontal Scrollable Pump Selector Tabs
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: List.generate(pumps.length, (i) {
+                    bool isSelected = i == _selectedPumpIdx;
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 10),
+                      child: ChoiceChip(
+                        label: Text(pumps[i].name, style: TextStyle(fontWeight: FontWeight.bold, color: isSelected ? Colors.white : StationColors.textDark)),
+                        selected: isSelected,
+                        selectedColor: StationColors.primary,
+                        onSelected: (val) {
+                          if (val) setState(() => _selectedPumpIdx = i);
+                        },
+                      ),
+                    );
+                  }),
                 ),
-              );
-            }),
-          ),
-          const SizedBox(height: 20),
+              ),
+              const SizedBox(height: 20),
 
           // Two-column Setup Layout
           LayoutBuilder(
@@ -120,45 +131,50 @@ class _PumpSetupScreenState extends State<PumpSetupScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        Wrap(
+                          spacing: 12,
+                          runSpacing: 10,
+                          alignment: WrapAlignment.spaceBetween,
+                          crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Text(pump.name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: StationColors.textDark)),
-                                      const SizedBox(width: 8),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          color: pump.active ? StationColors.successBg : Colors.grey.shade200,
-                                          borderRadius: BorderRadius.circular(6),
-                                          border: Border.all(color: pump.active ? StationColors.successGreen.withOpacity(0.4) : Colors.grey),
-                                        ),
-                                        child: Text(
-                                          pump.active ? 'Active' : 'Inactive',
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.bold,
-                                            color: pump.active ? StationColors.successGreen : Colors.grey.shade700,
-                                          ),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 4,
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  children: [
+                                    Text(pump.name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: StationColors.textDark)),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: pump.active ? StationColors.successBg : Colors.grey.shade200,
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(color: pump.active ? StationColors.successGreen.withOpacity(0.4) : Colors.grey),
+                                      ),
+                                      child: Text(
+                                        pump.active ? 'Active' : 'Inactive',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          color: pump.active ? StationColors.successGreen : Colors.grey.shade700,
                                         ),
                                       ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    '${AppStrings.get("serialNumber", lang)}: ${pump.serialNumber}',
-                                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: StationColors.textMedium),
-                                  ),
-                                ],
-                              ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '${AppStrings.get("serialNumber", lang)}: ${pump.serialNumber}',
+                                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: StationColors.textMedium),
+                                ),
+                              ],
                             ),
                             Wrap(
                               spacing: 8,
+                              runSpacing: 6,
+                              crossAxisAlignment: WrapCrossAlignment.center,
                               children: [
                                 OutlinedButton.icon(
                                   icon: const Icon(Icons.edit_outlined, size: 16),
@@ -181,34 +197,51 @@ class _PumpSetupScreenState extends State<PumpSetupScreen> {
                           ],
                         ),
                         const SizedBox(height: 16),
-                        // Nozzles Table
+                        // Nozzles Table (Horizontally scrollable on narrow mobile screens)
                         Container(
                           decoration: BoxDecoration(
                             border: Border.all(color: StationColors.divider),
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          child: Table(
-                            children: [
-                              const TableRow(
-                                decoration: BoxDecoration(color: Color(0xFFF7F9F9)),
-                                children: [
-                                  Padding(padding: EdgeInsets.all(8), child: Text('Nozzle', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
-                                  Padding(padding: EdgeInsets.all(8), child: Text('Fuel type', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
-                                  Padding(padding: EdgeInsets.all(8), child: Text('Receipt mapping', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
-                                  Padding(padding: EdgeInsets.all(8), child: Text('Previous reading', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
-                                ],
-                              ),
-                              ...pump.nozzles.map((n) {
-                                return TableRow(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: ConstrainedBox(
+                                constraints: BoxConstraints(
+                                  minWidth: (constraints.maxWidth - 42).clamp(380.0, 900.0),
+                                ),
+                                child: Table(
+                                  columnWidths: const {
+                                    0: FlexColumnWidth(1.1),
+                                    1: FlexColumnWidth(1.0),
+                                    2: FlexColumnWidth(1.3),
+                                    3: FlexColumnWidth(1.4),
+                                  },
                                   children: [
-                                    Padding(padding: const EdgeInsets.all(8), child: Text('Nozzle ${n.nozzleNumber}', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13))),
-                                    Padding(padding: const EdgeInsets.all(8), child: Text(n.fuelType, style: const TextStyle(fontSize: 13))),
-                                    const Padding(padding: EdgeInsets.all(8), child: Text('Preview mapping', style: TextStyle(fontSize: 12, color: Colors.blueGrey))),
-                                    Padding(padding: const EdgeInsets.all(8), child: Text(n.formattedPreviousReading, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
+                                    const TableRow(
+                                      decoration: BoxDecoration(color: Color(0xFFF7F9F9)),
+                                      children: [
+                                        Padding(padding: EdgeInsets.all(8), child: Text('Nozzle', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
+                                        Padding(padding: EdgeInsets.all(8), child: Text('Fuel type', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
+                                        Padding(padding: EdgeInsets.all(8), child: Text('Receipt mapping', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
+                                        Padding(padding: EdgeInsets.all(8), child: Text('Previous reading', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
+                                      ],
+                                    ),
+                                    ...pump.nozzles.map((n) {
+                                      return TableRow(
+                                        children: [
+                                          Padding(padding: const EdgeInsets.all(8), child: Text('Nozzle ${n.nozzleNumber}', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13))),
+                                          Padding(padding: const EdgeInsets.all(8), child: Text(n.fuelType, style: const TextStyle(fontSize: 13))),
+                                          const Padding(padding: EdgeInsets.all(8), child: Text('Preview mapping', style: TextStyle(fontSize: 12, color: Colors.blueGrey))),
+                                          Padding(padding: const EdgeInsets.all(8), child: Text(n.formattedPreviousReading, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
+                                        ],
+                                      );
+                                    }),
                                   ],
-                                );
-                              }),
-                            ],
+                                ),
+                              ),
+                            ),
                           ),
                         ),
                         const SizedBox(height: 10),
@@ -216,7 +249,9 @@ class _PumpSetupScreenState extends State<PumpSetupScreen> {
                           children: [
                             Icon(Icons.info_outline, size: 14, color: Colors.grey),
                             SizedBox(width: 6),
-                            Text('Confirm fuel mapping from station setup.', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                            Expanded(
+                              child: Text('Confirm fuel mapping from station setup.', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                            ),
                           ],
                         ),
                       ],
@@ -235,8 +270,11 @@ class _PumpSetupScreenState extends State<PumpSetupScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 4,
+                          alignment: WrapAlignment.spaceBetween,
+                          crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
                             const Text('Fuel rates (owner configured)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                             TextButton.icon(
@@ -263,7 +301,7 @@ class _PumpSetupScreenState extends State<PumpSetupScreen> {
                                     const SizedBox(height: 4),
                                     Text(
                                       _getFuelRateDisplay(pump, 'Petrol'),
-                                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: StationColors.textDark),
+                                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: StationColors.textDark),
                                     ),
                                   ],
                                 ),
@@ -284,7 +322,7 @@ class _PumpSetupScreenState extends State<PumpSetupScreen> {
                                     const SizedBox(height: 4),
                                     Text(
                                       _getFuelRateDisplay(pump, 'Diesel'),
-                                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: StationColors.textDark),
+                                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: StationColors.textDark),
                                     ),
                                   ],
                                 ),
@@ -336,8 +374,11 @@ class _PumpSetupScreenState extends State<PumpSetupScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 6,
+                      alignment: WrapAlignment.spaceBetween,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         const Text('Base Totaliser Proof', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                         Container(
@@ -454,6 +495,8 @@ class _PumpSetupScreenState extends State<PumpSetupScreen> {
         ],
       ),
     );
+      },
+    );
   }
 
   void _showSetOpeningBaselineDialog(BuildContext context, StationStateProvider state, Pump pump) {
@@ -558,7 +601,7 @@ class _PumpSetupScreenState extends State<PumpSetupScreen> {
 
   void _showUploadBaseProofDialog(BuildContext context, StationStateProvider state, Pump pump) {
     String? selectedImagePath;
-    String displayLabel = pump.referenceReceiptAsset ?? 'assets/images/media_1791616403909.jpg';
+    String displayLabel = pump.referenceReceiptAsset ?? 'assets/images/media_1791634198035.png';
 
     showDialog(
       context: context,
@@ -615,10 +658,17 @@ class _PumpSetupScreenState extends State<PumpSetupScreen> {
                       style: ElevatedButton.styleFrom(backgroundColor: StationColors.primary),
                       onPressed: () async {
                         final picker = ImagePicker();
-                        final file = await picker.pickImage(source: ImageSource.camera);
+                        final file = await picker.pickImage(
+                          source: ImageSource.camera,
+                          maxWidth: 1280,
+                          maxHeight: 1280,
+                          imageQuality: 75,
+                        );
                         if (file != null) {
+                          final bytes = await file.readAsBytes();
+                          final b64 = base64Encode(bytes);
                           setDialogState(() {
-                            selectedImagePath = file.path;
+                            selectedImagePath = 'data:image/jpeg;base64,$b64';
                             displayLabel = 'Captured: ${file.name}';
                           });
                         }
@@ -630,10 +680,17 @@ class _PumpSetupScreenState extends State<PumpSetupScreen> {
                       label: const Text('Pick from Gallery', style: TextStyle(fontSize: 12)),
                       onPressed: () async {
                         final picker = ImagePicker();
-                        final file = await picker.pickImage(source: ImageSource.gallery);
+                        final file = await picker.pickImage(
+                          source: ImageSource.gallery,
+                          maxWidth: 1280,
+                          maxHeight: 1280,
+                          imageQuality: 75,
+                        );
                         if (file != null) {
+                          final bytes = await file.readAsBytes();
+                          final b64 = base64Encode(bytes);
                           setDialogState(() {
-                            selectedImagePath = file.path;
+                            selectedImagePath = 'data:image/jpeg;base64,$b64';
                             displayLabel = 'Selected: ${file.name}';
                           });
                         }
@@ -654,7 +711,7 @@ class _PumpSetupScreenState extends State<PumpSetupScreen> {
               label: const Text('Save Proof Image', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
               style: ElevatedButton.styleFrom(backgroundColor: StationColors.successGreen),
               onPressed: () {
-                final pathToSave = selectedImagePath ?? 'assets/images/media_1791616403909.jpg';
+                final pathToSave = selectedImagePath ?? pump.referenceReceiptAsset ?? 'assets/images/media_1791634198035.png';
                 state.updatePumpBaseTotaliserImage(pump.id, pathToSave);
                 Navigator.pop(ctx);
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -952,7 +1009,7 @@ class _PumpSetupScreenState extends State<PumpSetupScreen> {
                   name: nameCtrl.text.trim(),
                   serialNumber: serialCtrl.text.trim(),
                   active: isActive,
-                  referenceReceiptAsset: 'assets/images/media_1791616403909.jpg',
+                  referenceReceiptAsset: 'assets/images/media_1791634198035.png',
                   nozzles: [
                     Nozzle(
                       id: '${pumpId}_n1',

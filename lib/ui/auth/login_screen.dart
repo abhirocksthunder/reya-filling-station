@@ -6,6 +6,8 @@ import '../../core/constants/dimensions.dart';
 import '../../models/user_profile.dart';
 import '../../services/station_state_provider.dart';
 import '../../services/app_version_service.dart';
+import '../../services/sentinel_alert_agent.dart';
+import '../../services/remote_logging_service.dart';
 import '../../widgets/version_footer.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -20,7 +22,9 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _identifierController = TextEditingController();
   final TextEditingController _pinController = TextEditingController();
+  final Map<String, int> _failedPinAttempts = {};
   bool _isLoading = false;
+  bool _isLockedOut = false;
   String? _errorMessage;
 
   @override
@@ -81,6 +85,11 @@ class _LoginScreenState extends State<LoginScreen> {
     );
 
     if (matchedUser == null || matchedUser.id.isEmpty) {
+      RemoteLoggingService().logWarn(
+        'Login failed: account not found for query "$query"',
+        screenName: 'LoginScreen',
+        action: 'login_not_found',
+      );
       setState(() {
         _isLoading = false;
         _errorMessage = 'Account not found. Please check your credentials or contact owner.';
@@ -88,22 +97,89 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    if (!matchedUser.active) {
+    if (matchedUser.isPendingApproval && !matchedUser.hasPendingEdit) {
       setState(() {
         _isLoading = false;
-        _errorMessage = 'Account is suspended. Contact station owner.';
+        _isLockedOut = false;
+        _errorMessage =
+            'Account pending Owner approval: Added by ${matchedUser.requestedBy ?? "Manager"}. Please ask Station Owner to approve your account in People & Roles.';
+      });
+      return;
+    }
+
+    if (!matchedUser.active) {
+      // Dispatch red flag alert to Station Owner on WhatsApp +919492757943
+      SentinelAlertAgent().notifyUserBlocked(
+        userEmail: matchedUser.email,
+        userName: matchedUser.name,
+        reason: 'Suspended user attempted login',
+      );
+      RemoteLoggingService().logError(
+        'Blocked/Suspended user ${matchedUser.name} attempted login',
+        screenName: 'LoginScreen',
+        action: 'blocked_user_login_attempt',
+        userId: matchedUser.id,
+        userRole: matchedUser.role.name,
+      );
+      setState(() {
+        _isLoading = false;
+        _isLockedOut = true;
+        _errorMessage = 'Account is suspended. Alert dispatched to Station Owner (+919492757943).';
       });
       return;
     }
 
     if (matchedUser.securityPin != enteredPin) {
+      final attempts = (_failedPinAttempts[matchedUser.id] ?? 0) + 1;
+      _failedPinAttempts[matchedUser.id] = attempts;
+
+      if (attempts >= 3) {
+        // Red flag: User locked out after 3 failed attempts
+        SentinelAlertAgent().notifyUserBlocked(
+          userEmail: matchedUser.email,
+          userName: matchedUser.name,
+          reason: '3 consecutive incorrect Security PIN attempts',
+          failedAttempts: '$attempts',
+        );
+        RemoteLoggingService().logError(
+          'User ${matchedUser.name} locked out after 3 failed PIN attempts',
+          screenName: 'LoginScreen',
+          action: 'user_locked_out_pin_attempts',
+          userId: matchedUser.id,
+          userRole: matchedUser.role.name,
+        );
+        setState(() {
+          _isLoading = false;
+          _isLockedOut = true;
+          _errorMessage = 'Account locked: 3 incorrect PIN attempts. Security alert sent to Owner (+919492757943).';
+        });
+        return;
+      }
+
+      RemoteLoggingService().logWarn(
+        'Incorrect PIN attempt $attempts for user ${matchedUser.name}',
+        screenName: 'LoginScreen',
+        action: 'incorrect_pin_attempt',
+        userId: matchedUser.id,
+        userRole: matchedUser.role.name,
+      );
       setState(() {
         _isLoading = false;
-        _errorMessage = 'Incorrect Security PIN. Please contact station admin if forgotten.';
+        _errorMessage = 'Incorrect Security PIN ($attempts/3 attempts). Please contact station admin if forgotten.';
       });
       return;
     }
 
+    // Success
+    _failedPinAttempts[matchedUser.id] = 0;
+    _isLockedOut = false;
+    RemoteLoggingService().logInfo(
+      'User ${matchedUser.name} (${matchedUser.role.name}) authenticated successfully',
+      screenName: 'LoginScreen',
+      action: 'login_success',
+      userId: matchedUser.id,
+      userRole: matchedUser.role.name,
+    );
     state.switchUser(matchedUser);
     widget.onLoginSuccess(matchedUser);
   }
@@ -150,7 +226,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                   // Station Title
                   const Text(
-                    'Reya Filling Station',
+                    'RFS',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 24,
@@ -188,6 +264,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   TextField(
                     controller: _identifierController,
                     maxLength: 30,
+                    textInputAction: TextInputAction.next,
+                    onSubmitted: (_) => FocusScope.of(context).nextFocus(),
                     inputFormatters: [LengthLimitingTextInputFormatter(30)],
                     decoration: InputDecoration(
                       labelText: 'Email or Mobile Number',
@@ -206,6 +284,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     obscureText: true,
                     keyboardType: TextInputType.number,
                     maxLength: 6,
+                    textInputAction: TextInputAction.done,
+                    onSubmitted: (_) => _handleLogin(state),
                     inputFormatters: [
                       FilteringTextInputFormatter.digitsOnly,
                       LengthLimitingTextInputFormatter(6),
@@ -229,9 +309,49 @@ class _LoginScreenState extends State<LoginScreen> {
                         color: StationColors.errorBg,
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Text(
-                        _errorMessage!,
-                        style: const TextStyle(color: StationColors.errorRed, fontSize: 12, fontWeight: FontWeight.bold),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _errorMessage!,
+                            style: const TextStyle(color: StationColors.errorRed, fontSize: 12, fontWeight: FontWeight.bold),
+                          ),
+                          if (_isLockedOut) ...[
+                            const SizedBox(height: 8),
+                            InkWell(
+                              onTap: () {
+                                final text = '🚨 *REYAA FILLING STATION LOCKOUT ALERT*\n'
+                                    'Account blocked for user: ${_identifierController.text.trim()}\n'
+                                    'Status: 3 failed attempts or suspended account.\n'
+                                    'Please unblock or reset Security PIN.';
+                                SentinelAlertAgent.openWhatsAppAlert(text);
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF25D366).withOpacity(0.12),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: const Color(0xFF25D366)),
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.chat_bubble_outline, size: 14, color: Color(0xFF1E7E34)),
+                                    SizedBox(width: 6),
+                                    Text(
+                                      'Notify Owner on WhatsApp (+919492757943)',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF1E7E34),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ),
                     const SizedBox(height: 12),

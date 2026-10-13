@@ -50,17 +50,23 @@ async function seed() {
     checkLocationBeforeScan: { booleanValue: true },
     allowStaffTotaliserCameraScan: { booleanValue: true },
     defaultLanguage: { stringValue: 'te' },
-    latestVersion: { stringValue: '1.0.2' },
-    latestBuildNumber: { integerValue: '3' },
-    updateUrl: { stringValue: '/static/reya-filling-station.apk' },
+    latestVersion: { stringValue: '1.0.32' },
+    latestBuildNumber: { integerValue: '33' },
+    updateUrl: { stringValue: 'https://reya-filling-station-chatrai.web.app/static/reya-filling-station-v1.0.32+33.apk' },
     forceUpdate: { booleanValue: true },
-    releaseNotes: { stringValue: 'Added camera slip capture, biometric quick login, and persistent session support.' },
+    releaseNotes: { stringValue: 'v1.0.32: Removed duplicate owner top navigation, hamburger drawer and desktop sidebar. Footer is now the main navigation on all devices; More retains Shifts, Credit, Users, Pumps and Settings. Overview section tabs remain available.' },
+    deletedEntryIds: {
+      arrayValue: {
+        values: [
+          { stringValue: 'entry_1791680675746' }
+        ]
+      }
+    },
     shiftTimings: {
       mapValue: {
         fields: {
-          Morning: { stringValue: '6:00 AM - 2:00 PM' },
-          Evening: { stringValue: '2:00 PM - 10:00 PM' },
-          Night: { stringValue: '10:00 PM - 6:00 AM' }
+          Morning: { stringValue: '9:00 AM - 9:00 PM' },
+          Night: { stringValue: '9:00 PM - 9:00 AM' }
         }
       }
     },
@@ -79,7 +85,7 @@ async function seed() {
     }
   });
 
-  // 3. Authoritative Members (Kalyan & Ranjit owners, Srikanth & Kishore staff)
+  // 3. Authoritative Members (Kalyan, Ranjit, Abhilash owners; Srinivas shift staff)
   await patchDoc('stations/chatrai/members/owner_kalyan', {
     id: { stringValue: 'owner_kalyan' },
     name: { stringValue: 'Kalyan' },
@@ -108,29 +114,29 @@ async function seed() {
     isOnline: { booleanValue: false }
   });
 
-  await patchDoc('stations/chatrai/members/staff_srikanth', {
-    id: { stringValue: 'staff_srikanth' },
-    name: { stringValue: 'Srikanth' },
-    email: { stringValue: 'srikanth@rfs.com' },
-    phoneNumber: { stringValue: '+91 98492 34567' },
-    role: { stringValue: 'shiftStaff' },
-    assignedShift: { stringValue: 'Morning' },
+  await patchDoc('stations/chatrai/members/user_1791651818556', {
+    id: { stringValue: 'user_1791651818556' },
+    name: { stringValue: 'Abhilash' },
+    email: { stringValue: 'abhi@rfs.com' },
+    phoneNumber: { stringValue: '9492757943' },
+    role: { stringValue: 'owner' },
+    assignedShift: { nullValue: null },
     village: { stringValue: 'Chatrai' },
-    address: { stringValue: 'Gandhi Nagar, Chatrai' },
+    address: { stringValue: 'Chatrai, Andhra Pradesh' },
     preferredLanguage: { stringValue: 'te' },
     active: { booleanValue: true },
     isOnline: { booleanValue: false }
   });
 
-  await patchDoc('stations/chatrai/members/staff_kishore', {
-    id: { stringValue: 'staff_kishore' },
-    name: { stringValue: 'Kishore' },
-    email: { stringValue: 'kishore@rfs.com' },
-    phoneNumber: { stringValue: '+91 97013 45678' },
+  await patchDoc('stations/chatrai/members/user_1791642830525', {
+    id: { stringValue: 'user_1791642830525' },
+    name: { stringValue: 'Srinivas' },
+    email: { stringValue: 'srinivas@rfs.com' },
+    phoneNumber: { stringValue: '9533677647' },
     role: { stringValue: 'shiftStaff' },
-    assignedShift: { stringValue: 'Evening' },
+    assignedShift: { stringValue: 'Morning' },
     village: { stringValue: 'Chatrai' },
-    address: { stringValue: 'Station Road, Chatrai' },
+    address: { stringValue: 'Chatrai, Andhra Pradesh' },
     preferredLanguage: { stringValue: 'te' },
     active: { booleanValue: true },
     isOnline: { booleanValue: false }

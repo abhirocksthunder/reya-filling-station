@@ -1,0 +1,4 @@
+# Actual shorebird.yaml is created by shorebird init after user login.
+# Never copy an example UUID into a production APK.
+app_id: REPLACE_WITH_USER_OWNED_PRODUCTION_APP_ID
+auto_update: true

@@ -139,10 +139,14 @@ class _MoneyLedgerScreenState extends State<MoneyLedgerScreen> {
         ? subTabFilteredEntries.sublist(startIndex, endIndex)
         : <TransactionEntry>[];
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    return LayoutBuilder(
+      builder: (context, screenConstraints) {
+        final isMobile = screenConstraints.maxWidth < 600;
+
+        return SingleChildScrollView(
+          padding: EdgeInsets.all(isMobile ? 14 : 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Header
           Text(
@@ -304,8 +308,11 @@ class _MoneyLedgerScreenState extends State<MoneyLedgerScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    Wrap(
+                      alignment: WrapAlignment.spaceBetween,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 8,
+                      runSpacing: 6,
                       children: [
                         Text(
                           _selectedDateFilter != null
@@ -452,8 +459,11 @@ class _MoneyLedgerScreenState extends State<MoneyLedgerScreen> {
               children: [
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  child: Wrap(
+                    alignment: WrapAlignment.spaceBetween,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 8,
+                    runSpacing: 4,
                     children: [
                       Text(
                         'Shift Entries Details (${subTabFilteredEntries.length})',
@@ -507,6 +517,10 @@ class _MoneyLedgerScreenState extends State<MoneyLedgerScreen> {
                           itemBuilder: (context, index) {
                             final entry = displayedEntries[index];
                             final isReceived = entry.direction == EntryDirection.received;
+                            final rawTime = (entry.timeString ?? '').trim();
+                            final timeLabel = rawTime.isNotEmpty
+                                ? rawTime
+                                : DateFormatter.formatDisplayTime(entry.createdAt);
 
                             return Padding(
                               padding: const EdgeInsets.all(16),
@@ -516,16 +530,21 @@ class _MoneyLedgerScreenState extends State<MoneyLedgerScreen> {
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
-                                      Row(
-                                        children: [
-                                          _buildCategoryChip(entry),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            entry.createdBy.isNotEmpty ? entry.createdBy : 'Staff',
-                                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: StationColors.textDark),
-                                          ),
-                                        ],
+                                      Expanded(
+                                        child: Wrap(
+                                          spacing: 8,
+                                          runSpacing: 4,
+                                          crossAxisAlignment: WrapCrossAlignment.center,
+                                          children: [
+                                            _buildCategoryChip(entry),
+                                            Text(
+                                              entry.createdBy.isNotEmpty ? entry.createdBy : 'Staff',
+                                              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: StationColors.textDark),
+                                            ),
+                                          ],
+                                        ),
                                       ),
+                                      const SizedBox(width: 8),
                                       Text(
                                         entry.formattedAmount,
                                         style: TextStyle(
@@ -544,9 +563,11 @@ class _MoneyLedgerScreenState extends State<MoneyLedgerScreen> {
                                         children: [
                                           const Icon(Icons.phone_android, size: 14, color: Colors.purple),
                                           const SizedBox(width: 4),
-                                          Text(
-                                            'Mobile: ${entry.phonePeNumber}',
-                                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.purple),
+                                          Expanded(
+                                            child: Text(
+                                              'Mobile: ${entry.phonePeNumber}',
+                                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.purple),
+                                            ),
                                           ),
                                         ],
                                       ),
@@ -559,118 +580,171 @@ class _MoneyLedgerScreenState extends State<MoneyLedgerScreen> {
                                         style: const TextStyle(fontSize: 12, color: StationColors.textMedium),
                                       ),
                                     ),
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text(
-                                        '${DateFormatter.formatDisplayDate(entry.createdAt)} • ${entry.timeString ?? DateFormatter.formatDisplayTime(entry.createdAt)}',
-                                        style: const TextStyle(fontSize: 11, color: StationColors.textLight),
-                                      ),
-                                      Text(
-                                        isReceived ? 'Received (+)' : 'Paid out (-)',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.bold,
-                                          color: isReceived ? StationColors.successGreen : StationColors.errorRed,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            );
-                          },
-                        );
-                      }
-
-                      // Wide Desktop / Tablet Table
-                      return SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: ConstrainedBox(
-                          constraints: BoxConstraints(minWidth: constraints.maxWidth),
-                          child: DataTable(
-                            headingRowColor: MaterialStateProperty.all(const Color(0xFFF7F9F9)),
-                            columns: const [
-                              DataColumn(label: Text('Date & Time (IST)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
-                              DataColumn(label: Text('Staff', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
-                              DataColumn(label: Text('Category', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
-                              DataColumn(label: Text('Details / PhonePe', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
-                              DataColumn(label: Text('Direction', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
-                              DataColumn(label: Text('Amount', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
-                            ],
-                            rows: displayedEntries.map((entry) {
-                              final isReceived = entry.direction == EntryDirection.received;
-                              return DataRow(
-                                cells: [
-                                  DataCell(
-                                    Text(
-                                      '${DateFormatter.formatDisplayDate(entry.createdAt)} • ${entry.timeString ?? DateFormatter.formatDisplayTime(entry.createdAt)}',
-                                      style: const TextStyle(fontSize: 12, color: StationColors.textMedium),
-                                    ),
-                                  ),
-                                  DataCell(
                                     Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                       children: [
-                                        const Icon(Icons.person_outline, size: 16, color: StationColors.textMedium),
-                                        const SizedBox(width: 6),
-                                        Text(entry.createdBy.isNotEmpty ? entry.createdBy : 'Staff', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                                        Expanded(
+                                          child: Wrap(
+                                            spacing: 6,
+                                            runSpacing: 4,
+                                            crossAxisAlignment: WrapCrossAlignment.center,
+                                            children: [
+                                              Text(
+                                                DateFormatter.formatDisplayDate(entry.createdAt),
+                                                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: StationColors.textMedium),
+                                              ),
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  color: StationColors.primary.withOpacity(0.08),
+                                                  borderRadius: BorderRadius.circular(5),
+                                                ),
+                                                child: Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    const Icon(Icons.access_time_filled_rounded, size: 11, color: StationColors.primary),
+                                                    const SizedBox(width: 3),
+                                                    Text(
+                                                      timeLabel,
+                                                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: StationColors.primary),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Text(
+                                              isReceived ? 'Received (+)' : 'Paid out (-)',
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.bold,
+                                                color: isReceived ? StationColors.successGreen : StationColors.errorRed,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            IconButton(
+                                              icon: const Icon(Icons.delete_outline, size: 18, color: StationColors.errorRed),
+                                              tooltip: 'Delete entry',
+                                              constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+                                              padding: EdgeInsets.zero,
+                                              onPressed: () => _confirmDeleteEntry(context, entry, state),
+                                            ),
+                                          ],
+                                        ),
                                       ],
                                     ),
-                                  ),
-                                  DataCell(_buildCategoryChip(entry)),
-                                  DataCell(
-                                    Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        if (entry.phonePeNumber != null && entry.phonePeNumber!.isNotEmpty)
-                                          Text(
-                                            'Mobile: ${entry.phonePeNumber}',
-                                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.purple),
-                                          ),
-                                        if (entry.reference != null && entry.reference!.isNotEmpty)
-                                          Text(
-                                            entry.reference!,
-                                            style: const TextStyle(fontSize: 12, color: StationColors.textMedium),
-                                          ),
-                                        if ((entry.phonePeNumber == null || entry.phonePeNumber!.isEmpty) && (entry.reference == null || entry.reference!.isEmpty))
-                                          const Text('—', style: TextStyle(color: Colors.grey, fontSize: 12)),
-                                      ],
-                                    ),
-                                  ),
-                                  DataCell(
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                      decoration: BoxDecoration(
-                                        color: isReceived ? Colors.green.withOpacity(0.12) : Colors.red.withOpacity(0.12),
-                                        borderRadius: BorderRadius.circular(4),
+                                  ],
+                                ),
+                              );
+                            },
+                          );
+                        }
+
+                        // Wide Desktop / Tablet Table
+                        return SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(minWidth: constraints.maxWidth),
+                            child: DataTable(
+                              headingRowColor: MaterialStateProperty.all(const Color(0xFFF7F9F9)),
+                              columns: const [
+                                DataColumn(label: Text('Date & Time (IST)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
+                                DataColumn(label: Text('Staff', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
+                                DataColumn(label: Text('Category', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
+                                DataColumn(label: Text('Details / PhonePe', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
+                                DataColumn(label: Text('Direction', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
+                                DataColumn(label: Text('Amount', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
+                                DataColumn(label: Text('Actions', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
+                              ],
+                              rows: displayedEntries.map((entry) {
+                                final isReceived = entry.direction == EntryDirection.received;
+                                final rawTime = (entry.timeString ?? '').trim();
+                                final timeLabel = rawTime.isNotEmpty
+                                    ? rawTime
+                                    : DateFormatter.formatDisplayTime(entry.createdAt);
+                                return DataRow(
+                                  cells: [
+                                    DataCell(
+                                      Text(
+                                        '${DateFormatter.formatDisplayDate(entry.createdAt)} • $timeLabel',
+                                        style: const TextStyle(fontSize: 12, color: StationColors.textMedium),
                                       ),
-                                      child: Text(
-                                        isReceived ? 'Received' : 'Paid out',
+                                    ),
+                                    DataCell(
+                                      Row(
+                                        children: [
+                                          const Icon(Icons.person_outline, size: 16, color: StationColors.textMedium),
+                                          const SizedBox(width: 6),
+                                          Text(entry.createdBy.isNotEmpty ? entry.createdBy : 'Staff', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                                        ],
+                                      ),
+                                    ),
+                                    DataCell(_buildCategoryChip(entry)),
+                                    DataCell(
+                                      Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          if (entry.phonePeNumber != null && entry.phonePeNumber!.isNotEmpty)
+                                            Text(
+                                              'Mobile: ${entry.phonePeNumber}',
+                                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.purple),
+                                            ),
+                                          if (entry.reference != null && entry.reference!.isNotEmpty)
+                                            Text(
+                                              entry.reference!,
+                                              style: const TextStyle(fontSize: 12, color: StationColors.textMedium),
+                                            ),
+                                          if ((entry.phonePeNumber == null || entry.phonePeNumber!.isEmpty) && (entry.reference == null || entry.reference!.isEmpty))
+                                            const Text('—', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                                        ],
+                                      ),
+                                    ),
+                                    DataCell(
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                        decoration: BoxDecoration(
+                                          color: isReceived ? Colors.green.withOpacity(0.12) : Colors.red.withOpacity(0.12),
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Text(
+                                          isReceived ? 'Received' : 'Paid out',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                            color: isReceived ? StationColors.successGreen : StationColors.errorRed,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    DataCell(
+                                      Text(
+                                        entry.formattedAmount,
                                         style: TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.bold,
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: 14,
                                           color: isReceived ? StationColors.successGreen : StationColors.errorRed,
                                         ),
                                       ),
                                     ),
-                                  ),
-                                  DataCell(
-                                    Text(
-                                      entry.formattedAmount,
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w800,
-                                        fontSize: 14,
-                                        color: isReceived ? StationColors.successGreen : StationColors.errorRed,
+                                    DataCell(
+                                      IconButton(
+                                        icon: const Icon(Icons.delete_outline, size: 18, color: StationColors.errorRed),
+                                        tooltip: 'Delete entry permanently',
+                                        constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+                                        onPressed: () => _confirmDeleteEntry(context, entry, state),
                                       ),
                                     ),
-                                  ),
-                                ],
-                              );
-                            }).toList(),
+                                  ],
+                                );
+                              }).toList(),
+                            ),
                           ),
-                        ),
-                      );
+                        );
                     },
                   ),
 
@@ -700,40 +774,79 @@ class _MoneyLedgerScreenState extends State<MoneyLedgerScreen> {
               borderRadius: BorderRadius.circular(StationDimensions.cardRadius),
               border: Border.all(color: StationColors.warningBorder),
             ),
-            child: Row(
-              children: [
-                const Icon(Icons.warning_amber_rounded, color: StationColors.warningAmber, size: 28),
-                const SizedBox(width: 14),
-                const Expanded(
-                  child: Column(
+            child: isMobile
+                ? Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'Illustrative categories — verify notebook abbreviations',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: StationColors.warningAmber),
+                      Row(
+                        children: const [
+                          Icon(Icons.warning_amber_rounded, color: StationColors.warningAmber, size: 24),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Illustrative categories',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: StationColors.warningAmber),
+                            ),
+                          ),
+                        ],
                       ),
-                      SizedBox(height: 2),
-                      Text(
+                      const SizedBox(height: 6),
+                      const Text(
                         'These amounts are calculated dynamically from forecourt entries. Verify category mappings for notebook abbreviations.',
                         style: TextStyle(fontSize: 12, color: StationColors.textMedium),
                       ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: StationColors.primary,
+                            foregroundColor: Colors.white,
+                            minimumSize: const Size(44, 44),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          onPressed: () => _showUncategorizedAuditDialog(context, state),
+                          child: const Text('Review uncategorized entry →', style: TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                    ],
+                  )
+                : Row(
+                    children: [
+                      const Icon(Icons.warning_amber_rounded, color: StationColors.warningAmber, size: 28),
+                      const SizedBox(width: 14),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Illustrative categories — verify notebook abbreviations',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: StationColors.warningAmber),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              'These amounts are calculated dynamically from forecourt entries. Verify category mappings for notebook abbreviations.',
+                              style: TextStyle(fontSize: 12, color: StationColors.textMedium),
+                            ),
+                          ],
+                        ),
+                      ),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: StationColors.primary,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        onPressed: () => _showUncategorizedAuditDialog(context, state),
+                        child: const Text('Review uncategorized entry →', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
                     ],
                   ),
-                ),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: StationColors.primary,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                  onPressed: () => _showUncategorizedAuditDialog(context, state),
-                  child: const Text('Review uncategorized entry →', style: TextStyle(fontWeight: FontWeight.bold)),
-                ),
-              ],
-            ),
           ),
         ],
       ),
+    );
+      },
     );
   }
 
@@ -942,5 +1055,56 @@ class _MoneyLedgerScreenState extends State<MoneyLedgerScreen> {
         ),
       ],
     );
+  }
+
+  Future<void> _confirmDeleteEntry(
+    BuildContext context,
+    TransactionEntry entry,
+    StationStateProvider state,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.delete_forever_outlined, color: StationColors.errorRed),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Delete Transaction Entry?',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'Permanently delete ${entry.category.displayName} entry of ${entry.formattedAmount} recorded by ${entry.createdBy}? This will remove it from both the app and Cloud Firestore.',
+          style: const TextStyle(fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: StationColors.errorRed),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete Entry', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      await state.deleteTransactionEntry(entry.id);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Deleted ${entry.category.displayName} entry (${entry.formattedAmount})'),
+            backgroundColor: StationColors.errorRed,
+          ),
+        );
+      }
+    }
   }
 }

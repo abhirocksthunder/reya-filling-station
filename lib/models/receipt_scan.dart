@@ -33,6 +33,7 @@ class ReceiptScan {
   final String printedDate; // "09/10/2026"
   final String printedTime; // "21:50:29"
   final Map<int, int> nozzleCumVolumeMl; // Nozzle 1 -> 169923720, Nozzle 2 -> 274487190
+  final Map<int, int>? nozzleRatesPaisePerLitre; // Nozzle 1 -> 10571, Nozzle 2 -> 9850 (fuel rate at scan time)
   final String imagePath;
   final String imageHash;
   final ReceiptValidationStatus validationStatus;
@@ -41,6 +42,10 @@ class ReceiptScan {
   final DateTime capturedAt;
   final bool locationVerified;
   final double distanceMeters;
+  final double? scanLatitude;
+  final double? scanLongitude;
+  final double? scanAccuracyMeters;
+  final String? scanLocationName;
   final String reviewStatus; // 'approved', 'pending', 'rejected'
 
   const ReceiptScan({
@@ -50,6 +55,7 @@ class ReceiptScan {
     required this.printedDate,
     required this.printedTime,
     required this.nozzleCumVolumeMl,
+    this.nozzleRatesPaisePerLitre,
     required this.imagePath,
     this.imageHash = '',
     required this.validationStatus,
@@ -58,6 +64,10 @@ class ReceiptScan {
     required this.capturedAt,
     this.locationVerified = true,
     this.distanceMeters = 24.0,
+    this.scanLatitude,
+    this.scanLongitude,
+    this.scanAccuracyMeters,
+    this.scanLocationName,
     this.reviewStatus = 'pending',
   });
 
@@ -73,6 +83,7 @@ class ReceiptScan {
     String? printedDate,
     String? printedTime,
     Map<int, int>? nozzleCumVolumeMl,
+    Map<int, int>? nozzleRatesPaisePerLitre,
     String? imagePath,
     String? imageHash,
     ReceiptValidationStatus? validationStatus,
@@ -81,6 +92,10 @@ class ReceiptScan {
     DateTime? capturedAt,
     bool? locationVerified,
     double? distanceMeters,
+    double? scanLatitude,
+    double? scanLongitude,
+    double? scanAccuracyMeters,
+    String? scanLocationName,
     String? reviewStatus,
   }) {
     return ReceiptScan(
@@ -90,6 +105,7 @@ class ReceiptScan {
       printedDate: printedDate ?? this.printedDate,
       printedTime: printedTime ?? this.printedTime,
       nozzleCumVolumeMl: nozzleCumVolumeMl ?? this.nozzleCumVolumeMl,
+      nozzleRatesPaisePerLitre: nozzleRatesPaisePerLitre ?? this.nozzleRatesPaisePerLitre,
       imagePath: imagePath ?? this.imagePath,
       imageHash: imageHash ?? this.imageHash,
       validationStatus: validationStatus ?? this.validationStatus,
@@ -98,6 +114,10 @@ class ReceiptScan {
       capturedAt: capturedAt ?? this.capturedAt,
       locationVerified: locationVerified ?? this.locationVerified,
       distanceMeters: distanceMeters ?? this.distanceMeters,
+      scanLatitude: scanLatitude ?? this.scanLatitude,
+      scanLongitude: scanLongitude ?? this.scanLongitude,
+      scanAccuracyMeters: scanAccuracyMeters ?? this.scanAccuracyMeters,
+      scanLocationName: scanLocationName ?? this.scanLocationName,
       reviewStatus: reviewStatus ?? this.reviewStatus,
     );
   }
@@ -110,6 +130,8 @@ class ReceiptScan {
       'printedDate': printedDate,
       'printedTime': printedTime,
       'nozzleCumVolumeMl': nozzleCumVolumeMl.map((k, v) => MapEntry(k.toString(), v)),
+      if (nozzleRatesPaisePerLitre != null)
+        'nozzleRatesPaisePerLitre': nozzleRatesPaisePerLitre!.map((k, v) => MapEntry(k.toString(), v)),
       'imagePath': imagePath,
       'imageHash': imageHash,
       'validationStatus': validationStatus.name,
@@ -118,6 +140,10 @@ class ReceiptScan {
       'capturedAt': capturedAt.toIso8601String(),
       'locationVerified': locationVerified,
       'distanceMeters': distanceMeters,
+      if (scanLatitude != null) 'scanLatitude': scanLatitude,
+      if (scanLongitude != null) 'scanLongitude': scanLongitude,
+      if (scanAccuracyMeters != null) 'scanAccuracyMeters': scanAccuracyMeters,
+      if (scanLocationName != null) 'scanLocationName': scanLocationName,
       'reviewStatus': reviewStatus,
     };
   }
@@ -129,6 +155,15 @@ class ReceiptScan {
       parsedMap[int.tryParse(k) ?? 1] = (v as num).toInt();
     });
 
+    Map<int, int>? parsedRates;
+    if (map['nozzleRatesPaisePerLitre'] != null) {
+      Map<String, dynamic> rawRates = map['nozzleRatesPaisePerLitre'];
+      parsedRates = {};
+      rawRates.forEach((k, v) {
+        parsedRates![int.tryParse(k) ?? 1] = (v as num).toInt();
+      });
+    }
+
     final capturedBy = map['capturedBy'] ?? '';
     final isOwner = capturedBy.toString().toLowerCase().contains('owner');
 
@@ -139,6 +174,7 @@ class ReceiptScan {
       printedDate: map['printedDate'] ?? '',
       printedTime: map['printedTime'] ?? '',
       nozzleCumVolumeMl: parsedMap,
+      nozzleRatesPaisePerLitre: parsedRates,
       imagePath: map['imagePath'] ?? '',
       imageHash: map['imageHash'] ?? '',
       validationStatus: ReceiptValidationStatus.values.firstWhere(
@@ -150,6 +186,10 @@ class ReceiptScan {
       capturedAt: DateTime.tryParse(map['capturedAt'] ?? '') ?? DateTime.now(),
       locationVerified: map['locationVerified'] ?? true,
       distanceMeters: (map['distanceMeters'] as num?)?.toDouble() ?? 24.0,
+      scanLatitude: (map['scanLatitude'] as num?)?.toDouble(),
+      scanLongitude: (map['scanLongitude'] as num?)?.toDouble(),
+      scanAccuracyMeters: (map['scanAccuracyMeters'] as num?)?.toDouble(),
+      scanLocationName: map['scanLocationName']?.toString(),
       reviewStatus: map['reviewStatus'] ?? (isOwner ? 'approved' : 'pending'),
     );
   }

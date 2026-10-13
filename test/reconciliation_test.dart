@@ -1,7 +1,15 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:reya_filling_station/core/formatting/currency_formatter.dart';
 import 'package:reya_filling_station/core/formatting/volume_formatter.dart';
+import 'package:reya_filling_station/models/shift.dart';
 import 'package:reya_filling_station/services/reconciliation_service.dart';
+import 'package:reya_filling_station/services/station_state_provider.dart';
+import 'package:reya_filling_station/ui/staff/close_shift_screen.dart';
+import 'package:reya_filling_station/ui/owner/station_overview_screen.dart';
+import 'package:reya_filling_station/ui/owner/shift_review_screen.dart';
 
 void main() {
   group('ReconciliationService Golden Fixtures', () {
@@ -126,6 +134,136 @@ void main() {
         ),
         throwsArgumentError,
       );
+    });
+  });
+
+  group('Shift Submission, Notification, Details Modal & Owner Approval Workflow', () {
+    setUp(() {
+      SharedPreferences.setMockInitialValues({});
+    });
+
+    test('submitShiftForReview updates status, dispatches owner notification, and approveShift/rejectShift update status', () {
+      final provider = StationStateProvider();
+      final initialNotifs = provider.notifications.length;
+
+      provider.submitShiftForReview(1525000, handoverReceiver: 'Manager Ravi');
+
+      final shift = provider.activeShift;
+      expect(shift.status, equals(ShiftStatus.needsReview));
+      expect(shift.cashHandoverPaise, equals(1525000));
+      expect(shift.handoverReceiver, equals('Manager Ravi'));
+      expect(provider.selectedReviewShiftId, equals(shift.id));
+      expect(provider.notifications.length, equals(initialNotifs + 1));
+      expect(provider.notifications.first.title, contains('Shift Approval Requested'));
+
+      // Approve shift
+      provider.approveShift(shift.id);
+      expect(provider.activeShift.status, equals(ShiftStatus.approved));
+      expect(provider.notifications.first.title, contains('Shift Approved'));
+
+      // Reject / Request correction
+      provider.rejectShift(shift.id, reason: 'Recount cash float');
+      expect(provider.activeShift.status, equals(ShiftStatus.inProgress));
+      expect(provider.activeShift.note, equals('Recount cash float'));
+      expect(provider.notifications.first.title, contains('Shift Returned for Correction'));
+    });
+
+    testWidgets('CloseShiftScreen View details opens Shift Reconciliation Details modal and Submit notifies owner', (tester) async {
+      final provider = StationStateProvider();
+      await tester.pumpWidget(
+        ChangeNotifierProvider<StationStateProvider>.value(
+          value: provider,
+          child: const MaterialApp(
+            home: Scaffold(
+              body: CloseShiftScreen(),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Tap "View details" button
+      final viewDetailsBtn = find.text('View details');
+      expect(viewDetailsBtn, findsOneWidget);
+      await tester.ensureVisible(viewDetailsBtn);
+      await tester.pumpAndSettle();
+      await tester.tap(viewDetailsBtn);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Shift Reconciliation Details'), findsOneWidget);
+      expect(find.text('Payment & Cash Summary'), findsOneWidget);
+
+      // Close modal
+      await tester.tap(find.text('Close'));
+      await tester.pumpAndSettle();
+
+      // Tap "Submit shift for review"
+      final submitBtn = find.text('Submit shift for review');
+      expect(submitBtn, findsOneWidget);
+      await tester.ensureVisible(submitBtn);
+      await tester.pumpAndSettle();
+      await tester.tap(submitBtn);
+      await tester.pumpAndSettle();
+
+      expect(provider.activeShift.status, equals(ShiftStatus.needsReview));
+      expect(find.text('Submitted — Awaiting Owner Approval'), findsOneWidget);
+    });
+
+    testWidgets('StationOverviewScreen shows Shift Approval Request and navigates to ShiftReviewScreen on tap', (tester) async {
+      final provider = StationStateProvider();
+      provider.submitShiftForReview(2500000, handoverReceiver: 'Owner');
+
+      int? navigatedTab;
+      await tester.pumpWidget(
+        ChangeNotifierProvider<StationStateProvider>.value(
+          value: provider,
+          child: MaterialApp(
+            home: Scaffold(
+              body: StationOverviewScreen(
+                onNavigate: (tabIndex) => navigatedTab = tabIndex,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.byKey(const ValueKey('overview-section-operations')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('overview-section-operations')));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Shift Approval Request'), findsOneWidget);
+      final reviewCardBtn = find.text('Approve / Review').first;
+      await tester.ensureVisible(reviewCardBtn);
+      await tester.pumpAndSettle();
+      await tester.tap(reviewCardBtn);
+      await tester.pumpAndSettle();
+
+      expect(navigatedTab, equals(2));
+      expect(provider.selectedReviewShiftId, equals(provider.activeShift.id));
+
+      // Render ShiftReviewScreen and verify Approve Shift & Handover works
+      await tester.pumpWidget(
+        ChangeNotifierProvider<StationStateProvider>.value(
+          value: provider,
+          child: const MaterialApp(
+            home: Scaffold(
+              body: ShiftReviewScreen(),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final approveBtn = find.text('Approve Shift & Handover');
+      expect(approveBtn, findsOneWidget);
+      await tester.ensureVisible(approveBtn);
+      await tester.pumpAndSettle();
+      await tester.tap(approveBtn);
+      await tester.pumpAndSettle();
+
+      expect(provider.activeShift.status, equals(ShiftStatus.approved));
+      expect(find.text('Shift Approved'), findsOneWidget);
     });
   });
 }

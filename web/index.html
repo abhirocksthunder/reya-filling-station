@@ -17,22 +17,74 @@
   <base href="$FLUTTER_BASE_HREF">
 
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="Reya Filling Station (Chatrai) Forecourt & Station Management">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="Reya Filling Station">
+  <meta name="apple-mobile-web-app-title" content="RFS">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
 
-  <title>Reya Filling Station</title>
+  <title>RFS</title>
   <link rel="manifest" href="manifest.json">
+  <link rel="preload" href="fuel-to-dashboard.gif" as="image">
+  <style>
+    html, body { margin: 0; background: #f7f5ef; }
+    #startup-loader { position: fixed; inset: 0; z-index: 99999;
+      display: grid; place-items: center; overflow: auto; padding: 24px;
+      box-sizing: border-box; background: #f7f5ef; color: #0c4a4d;
+      font-family: system-ui, sans-serif; text-align: center; }
+    .startup-content { width: min(100%, 420px); }
+    .startup-art { display: block; width: min(100%, 320px); height: auto;
+      margin: 0 auto; border-radius: 24px; }
+    .startup-still { display: none; }
+    #startup-loader h1 { margin: 12px 0; font-size: clamp(22px, 5vw, 28px); }
+    #startup-status { line-height: 1.6; margin: 8px 0 20px; }
+    #startup-retry { min-height: 48px; padding: 12px 24px; border: 0;
+      border-radius: 12px; background: #0c4a4d; color: white;
+      font: inherit; cursor: pointer; }
+    #startup-retry:focus-visible { outline: 3px solid #e65100; outline-offset: 4px; }
+    @media (prefers-reduced-motion: reduce) {
+      .startup-animation { display: none; }
+      .startup-still { display: block; }
+    }
+  </style>
 </head>
 <body>
+  <!-- Static HTML paints before Flutter, Firebase, or any third-party downloads. -->
+  <div id="startup-loader" aria-label="Reya Filling Station is loading" aria-busy="true">
+    <div class="startup-content">
+      <img class="startup-art startup-animation" src="fuel-to-dashboard.gif"
+        width="320" height="320" alt="" fetchpriority="high">
+      <img class="startup-art startup-still" src="fuel-to-dashboard-still.png"
+        width="320" height="320" alt="">
+      <h1>Reya Filling Station</h1>
+      <p id="startup-status" role="status" aria-live="polite">Getting your station ready…</p>
+      <button id="startup-retry" type="button" hidden>Reload</button>
+      <noscript><p>Please enable JavaScript to open your station.</p></noscript>
+    </div>
+  </div>
+  <script>
+    (function() {
+      var loader = document.getElementById('startup-loader');
+      var retry = document.getElementById('startup-retry');
+      retry.addEventListener('click', function() { window.location.reload(); });
+      var slowTimer = setTimeout(function() {
+        document.getElementById('startup-status').textContent =
+          'Taking longer than usual. Check your connection, or try reloading.';
+        retry.hidden = false;
+      }, 20000);
+      window.addEventListener('flutter-first-frame', function() {
+        clearTimeout(slowTimer);
+        loader.remove();
+      }, { once: true });
+    })();
+  </script>
   <!--
     You can customize the "flutter_bootstrap.js" script.
     This is useful to provide a custom configuration to the Flutter loader
@@ -41,19 +93,146 @@
     For more details:
     * https://docs.flutter.dev/platform-integration/web/initialization
   -->
-  <!-- Tesseract.js for In-Browser Receipt OCR on Web -->
-  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <!-- Tesseract.js & heic2any for In-Browser Receipt OCR (JPG, PNG, HEIC/HEIF) on Web -->
   <script>
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.getRegistrations().then(function(registrations) {
-        for (var i = 0; i < registrations.length; i++) {
-          registrations[i].update();
+    // Immediately unregister any stale caching service workers and auto-clear CacheStorage & stale localStorage keys when a new version is deployed
+    (function() {
+      var DEPLOYED_VERSION = '1.0.32+33';
+      try {
+        var staleKeys = [
+          'flutter.rfs_entries_list',
+          'flutter.rfs_entries_list_v3',
+          'flutter.rfs_receipts_list',
+          'flutter.rfs_receipts_list_v3',
+          'flutter.rfs_shifts_list',
+          'flutter.rfs_shifts_list_v3',
+          'flutter.rfs_users_list',
+          'flutter.rfs_users_list_v3',
+          'flutter.rfs_settings_json',
+          'flutter.rfs_settings_json_v3'
+        ];
+        for (var k = 0; k < staleKeys.length; k++) {
+          localStorage.removeItem(staleKeys[k]);
         }
+      } catch (_) {}
+
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+          for (var i = 0; i < registrations.length; i++) {
+            registrations[i].unregister();
+          }
+        });
+      }
+
+      fetch('/version.json?t=' + Date.now(), { cache: 'no-store' })
+        .then(function(res) { return res.ok ? res.json() : null; })
+        .then(function(data) {
+          var remoteVer = (data && data.web_revision) ? data.web_revision : (data && data.version) ? (data.version + '+' + (data.build_number || '')) : DEPLOYED_VERSION;
+          var cachedVer = localStorage.getItem('rfs_web_deployed_version');
+          if (cachedVer && cachedVer !== remoteVer) {
+            localStorage.setItem('rfs_web_deployed_version', remoteVer);
+            if ('caches' in window) {
+              caches.keys().then(function(names) {
+                return Promise.all(names.map(function(name) { return caches.delete(name); }));
+              }).then(function() {
+                window.location.reload();
+              });
+            } else {
+              window.location.reload();
+            }
+          } else {
+            localStorage.setItem('rfs_web_deployed_version', remoteVer);
+          }
+        })
+        .catch(function() {});
+    })();
+
+    // Receipt processing is loaded only when scanning, never on the startup path.
+    var receiptLibrariesPromise;
+    function loadReceiptLibrary(src) {
+      return new Promise(function(resolve, reject) {
+        var script = document.createElement('script');
+        script.src = src;
+        script.async = true;
+        script.onload = resolve;
+        script.onerror = function() {
+          script.remove();
+          reject(new Error('Receipt tools could not load. Check your connection and retry.'));
+        };
+        document.head.appendChild(script);
+      });
+    }
+    function loadReceiptLibraries() {
+      if (!receiptLibrariesPromise) {
+        receiptLibrariesPromise = Promise.all([
+          typeof heic2any !== 'undefined' ? Promise.resolve() :
+            loadReceiptLibrary('https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js'),
+          typeof Tesseract !== 'undefined' ? Promise.resolve() :
+            loadReceiptLibrary('https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js')
+        ]).catch(function(error) {
+          receiptLibrariesPromise = null;
+          throw error;
+        });
+      }
+      return receiptLibrariesPromise;
+    }
+    window.performWebOcr = function(imageUrl, onSuccess, onError) {
+      loadReceiptLibraries().then(function() {
+        performReadyWebOcr(imageUrl, onSuccess, onError);
+      }).catch(function(error) {
+        if (onError) onError(error.message);
+      });
+    };
+
+    // Helper: detect if a Blob or Data URI is HEIC / HEIF and convert to JPEG URL via heic2any
+    function ensureBrowserDecodableImageUrl(inputUrl) {
+      return new Promise(function(resolve) {
+        if (!inputUrl || typeof heic2any === 'undefined') {
+          resolve(inputUrl);
+          return;
+        }
+        var lower = inputUrl.toLowerCase();
+        var looksLikeHeic = lower.indexOf('image/heic') !== -1 ||
+            lower.indexOf('image/heif') !== -1 ||
+            lower.indexOf('.heic') !== -1 ||
+            lower.indexOf('.heif') !== -1;
+
+        fetch(inputUrl)
+          .then(function(res) { return res.blob(); })
+          .then(function(blob) {
+            return blob.slice(0, 12).arrayBuffer().then(function(buf) {
+              var bytes = new Uint8Array(buf);
+              var isFtypHeic = false;
+              if (bytes.length >= 12 && bytes[4] === 0x66 && bytes[5] === 0x74 && bytes[6] === 0x79 && bytes[7] === 0x70) {
+                var brand = String.fromCharCode(bytes[8], bytes[9], bytes[10], bytes[11]).toLowerCase();
+                if (brand.indexOf('heic') !== -1 || brand.indexOf('heix') !== -1 || brand.indexOf('mif1') !== -1 || brand.indexOf('msf1') !== -1) {
+                  isFtypHeic = true;
+                }
+              }
+              if (looksLikeHeic || isFtypHeic || (blob.type && (blob.type.indexOf('heic') !== -1 || blob.type.indexOf('heif') !== -1))) {
+                console.log('Converting HEIC/HEIF receipt photo to JPEG in browser via heic2any...');
+                return heic2any({ blob: blob, toType: 'image/jpeg', quality: 0.92 })
+                  .then(function(converted) {
+                    var targetBlob = Array.isArray(converted) ? converted[0] : converted;
+                    resolve(URL.createObjectURL(targetBlob));
+                  })
+                  .catch(function(convErr) {
+                    console.warn('heic2any conversion fallback:', convErr);
+                    resolve(inputUrl);
+                  });
+              } else {
+                resolve(inputUrl);
+              }
+            });
+          })
+          .catch(function() {
+            resolve(inputUrl);
+          });
       });
     }
 
-    // High-Precision In-Browser Thermal Receipt OCR Engine
-    window.performWebOcr = function(imageUrl, onSuccess, onError) {
+    // High-Precision In-Browser Thermal Receipt OCR Engine (Supports JPG, PNG, HEIC/HEIF)
+    function performReadyWebOcr(imageUrl, onSuccess, onError) {
       if (typeof Tesseract === 'undefined') {
         console.warn('Tesseract.js is not loaded yet');
         if (onError) onError('Tesseract.js is not loaded');
@@ -61,75 +240,64 @@
       }
 
       console.log('Starting In-Browser Web OCR for image...');
-      var img = new Image();
-      img.crossOrigin = 'anonymous';
+      ensureBrowserDecodableImageUrl(imageUrl).then(function(resolvedUrl) {
+        // Pass 1: Recognize natural image using Tesseract's built-in adaptive Otsu thresholding
+        Tesseract.recognize(resolvedUrl, 'eng')
+          .then(function(result) {
+            var text1 = (result && result.data && result.data.text) ? result.data.text : '';
+            if (text1 && (text1.toLowerCase().indexOf('cum') !== -1 || text1.toLowerCase().indexOf('nozzle') !== -1 || text1.length > 60)) {
+              console.log('Web Tesseract OCR Direct Pass Success. Recognized text length:', text1.length);
+              if (onSuccess) onSuccess(text1);
+              return;
+            }
 
-      img.onload = function() {
-        try {
-          var canvas = document.createElement('canvas');
-          var ctx = canvas.getContext('2d');
-          canvas.width = img.width;
-          canvas.height = img.height;
-          ctx.drawImage(img, 0, 0);
+            // Pass 2: Contrast-stretched grayscale canvas fallback
+            var img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.onload = function() {
+              try {
+                var canvas = document.createElement('canvas');
+                var ctx = canvas.getContext('2d');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                ctx.drawImage(img, 0, 0);
 
-          // Contrast enhancement for thermal receipts
-          var imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          var d = imgData.data;
-          for (var i = 0; i < d.length; i += 4) {
-            var gray = d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114;
-            // Adaptive binarization: boost faint thermal printing
-            var val = gray < 165 ? 0 : 255;
-            d[i] = val;
-            d[i + 1] = val;
-            d[i + 2] = val;
-          }
-          ctx.putImageData(imgData, 0, 0);
+                var imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                var d = imgData.data;
+                for (var i = 0; i < d.length; i += 4) {
+                  var gray = d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114;
+                  // Gentle contrast stretch without destructive black-out
+                  var stretched = Math.max(0, Math.min(255, (gray - 50) * 1.45));
+                  d[i] = stretched;
+                  d[i + 1] = stretched;
+                  d[i + 2] = stretched;
+                }
+                ctx.putImageData(imgData, 0, 0);
 
-          Tesseract.recognize(canvas, 'eng')
-            .then(function(result) {
-              var text = (result && result.data && result.data.text) ? result.data.text : '';
-              console.log('Web Tesseract OCR Success. Recognized text length:', text.length);
-              if (onSuccess) onSuccess(text);
-            })
-            .catch(function(err) {
-              console.warn('Canvas OCR recognition failed, trying direct image:', err);
-              Tesseract.recognize(imageUrl, 'eng')
-                .then(function(res2) {
-                  var text2 = (res2 && res2.data && res2.data.text) ? res2.data.text : '';
-                  if (onSuccess) onSuccess(text2);
-                })
-                .catch(function(err2) {
-                  if (onError) onError(err2 ? err2.toString() : 'OCR recognition error');
-                });
-            });
-        } catch (e) {
-          console.warn('Canvas processing exception, trying direct image:', e);
-          Tesseract.recognize(imageUrl, 'eng')
-            .then(function(res) {
-              var text = (res && res.data && res.data.text) ? res.data.text : '';
-              if (onSuccess) onSuccess(text);
-            })
-            .catch(function(err) {
-              if (onError) onError(err ? err.toString() : 'Direct OCR error');
-            });
-        }
-      };
-
-      img.onerror = function(err) {
-        console.warn('Image load failed, attempting direct recognize:', err);
-        Tesseract.recognize(imageUrl, 'eng')
-          .then(function(res) {
-            var text = (res && res.data && res.data.text) ? res.data.text : '';
-            if (onSuccess) onSuccess(text);
+                Tesseract.recognize(canvas, 'eng')
+                  .then(function(res2) {
+                    var text2 = (res2 && res2.data && res2.data.text) ? res2.data.text : '';
+                    if (onSuccess) onSuccess(text2.length > text1.length ? text2 : text1);
+                  })
+                  .catch(function() {
+                    if (onSuccess) onSuccess(text1);
+                  });
+              } catch (_) {
+                if (onSuccess) onSuccess(text1);
+              }
+            };
+            img.onerror = function() {
+              if (onSuccess) onSuccess(text1);
+            };
+            img.src = resolvedUrl;
           })
-          .catch(function(err2) {
-            if (onError) onError(err2 ? err2.toString() : 'Image load error');
+          .catch(function(err) {
+            console.warn('Direct OCR pass failed:', err);
+            if (onError) onError(err ? err.toString() : 'OCR recognition error');
           });
-      };
-
-      img.src = imageUrl;
+      });
     };
   </script>
-  <script src="flutter_bootstrap.js?v=1.0.4.5" async></script>
+  <script src="flutter_bootstrap.js?v=1.0.32.33" async></script>
 </body>
 </html>

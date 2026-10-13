@@ -25,7 +25,7 @@ void main() {
       expect(cust.name, equals('Ramesh Reddy'));
       expect(cust.subtitle, equals('Tractor AP16 XX1234'));
       expect(cust.pendingAmountPaise, equals(500000));
-      expect(cust.formattedPending, equals('₹5,000'));
+      expect(cust.formattedPending, equals('₹5,000.00'));
 
       // Verify entry was added
       expect(state.entries.length, equals(1));
@@ -34,7 +34,7 @@ void main() {
 
       // Verify dynamic notification dispatched
       expect(state.notifications.isNotEmpty, isTrue);
-      expect(state.notifications.first.title, contains('Credit Sale: ₹5,000'));
+      expect(state.notifications.first.title, contains('Credit Sale: ₹5,000.00'));
     });
 
     test('2. Additional credit sale for existing customer accumulates pending amount', () {
@@ -60,7 +60,7 @@ void main() {
       // Still 1 unique customer with combined balance of ₹18,000
       expect(state.creditCustomers.length, equals(1));
       expect(state.creditCustomers.first.pendingAmountPaise, equals(1800000));
-      expect(state.creditCustomers.first.formattedPending, equals('₹18,000'));
+      expect(state.creditCustomers.first.formattedPending, equals('₹18,000.00'));
     });
 
     test('3. Recording credit payment deducts balance and records payment history', () {
@@ -96,7 +96,7 @@ void main() {
         printedDate: '10/10/2026',
         printedTime: '18:30:00',
         nozzleCumVolumeMl: {1: 175000000, 2: 280000000},
-        imagePath: 'assets/images/media_1791616403909.jpg',
+        imagePath: 'assets/images/media_1791634198035.png',
         validationStatus: ReceiptValidationStatus.valid,
         statusMessage: 'Verified OCR capture',
         capturedBy: 'Srikanth (live capture)',
@@ -131,7 +131,7 @@ void main() {
         printedDate: '10/10/2026',
         printedTime: '19:00:00',
         nozzleCumVolumeMl: {1: 176000000, 2: 281000000},
-        imagePath: 'assets/images/media_1791616403909.jpg',
+        imagePath: 'assets/images/media_1791634198035.png',
         validationStatus: ReceiptValidationStatus.valid,
         statusMessage: 'Owner upload',
         capturedBy: 'Kalyan (Owner Upload)',
@@ -142,6 +142,30 @@ void main() {
 
       expect(state.receipts.length, equals(1));
       expect(state.receipts.first.reviewStatus, equals('approved'));
+    });
+
+    test('6. ReceiptScan preserves Base64 data URI receipt images from staff camera uploads', () {
+      const mockBase64Image = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP...';
+      final staffScan = ReceiptScan(
+        id: 'scan_staff_b64',
+        pumpSerialNumber: '202501001272',
+        fpId: '1',
+        printedDate: '10/10/2026',
+        printedTime: '21:05:00',
+        nozzleCumVolumeMl: {1: 177000000, 2: 282000000},
+        imagePath: mockBase64Image,
+        validationStatus: ReceiptValidationStatus.valid,
+        statusMessage: 'Staff uploaded camera receipt',
+        capturedBy: 'Srikanth (live capture)',
+        capturedAt: DateTime.now(),
+      );
+
+      final map = staffScan.toMap();
+      expect(map['imagePath'], equals(mockBase64Image));
+
+      final restored = ReceiptScan.fromMap(map);
+      expect(restored.imagePath, equals(mockBase64Image));
+      expect(restored.imagePath.startsWith('data:image/jpeg;base64,'), isTrue);
     });
   });
 }

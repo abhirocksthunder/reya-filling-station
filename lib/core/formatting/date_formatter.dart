@@ -35,6 +35,16 @@ class DateFormatter {
     return DateFormat('h:mm a').format(toIST(dateTime));
   }
 
+  /// Formats IST time with explicit IST suffix: "12:15 pm IST"
+  static String formatTimeIST(DateTime dateTime) {
+    return '${DateFormat('h:mm a').format(toIST(dateTime))} IST';
+  }
+
+  /// Formats IST date & time with explicit IST suffix: "10 Oct 2026, 12:15 pm IST"
+  static String formatDateTimeIST(DateTime dateTime) {
+    return '${DateFormat('d MMM yyyy, h:mm a').format(toIST(dateTime))} IST';
+  }
+
   /// Formats IST timestamp as required by AIPCC guidelines: "10 Oct 2026 2:05 pm"
   static String formatAipccTimestamp(DateTime dateTime) {
     return DateFormat('d MMM yyyy h:mm a').format(toIST(dateTime));

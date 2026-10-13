@@ -16,6 +16,9 @@ class OcrReceiptExtraction {
   final double confidence;
   final bool isStrictMatch;
   final List<String> auditLog;
+  final String engineUsed;
+  final int durationMs;
+  final String? underlyingEngineError;
 
   const OcrReceiptExtraction({
     required this.success,
@@ -31,30 +34,54 @@ class OcrReceiptExtraction {
     this.confidence = 1.0,
     this.isStrictMatch = true,
     this.auditLog = const [],
+    this.engineUsed = 'Google ML Kit (On-Device)',
+    this.durationMs = 0,
+    this.underlyingEngineError,
   });
 }
 
 class OcrService {
-  static Future<OcrReceiptExtraction> processReceiptImage(String imagePath, {String? targetPumpId}) async {
+  static OcrReceiptExtraction? lastExtraction;
+
+  static Future<OcrReceiptExtraction> processReceiptImage(
+    String imagePath, {
+    String? targetPumpId,
+    Map<int, double>? expectedBaselineLitres,
+  }) async {
+    final stopwatch = Stopwatch()..start();
+    final String currentEngine = kIsWeb ? 'Tesseract.js (In-Browser Web)' : 'Google ML Kit (On-Device Android)';
     String extractedText = '';
+    String? engineError;
 
     try {
       final engine = getOcrEngine();
       extractedText = await engine.recognizeTextFromPath(imagePath);
     } catch (e) {
-      debugPrint('OCR engine execution error/fallback: $e');
+      engineError = e.toString();
+      debugPrint('OCR engine execution error: $e');
+    }
+
+    stopwatch.stop();
+    final int duration = stopwatch.elapsedMilliseconds;
+
+    OcrReceiptExtraction record(OcrReceiptExtraction extraction) {
+      lastExtraction = extraction;
+      return extraction;
     }
 
     // 1. If on-device ML Kit successfully recognized text, parse it strictly
     if (extractedText.trim().isNotEmpty) {
-      final parseRes = OcrParserService.parseIndianOilReceipt(extractedText);
+      final parseRes = OcrParserService.parseIndianOilReceipt(
+        extractedText,
+        expectedBaselineLitres: expectedBaselineLitres,
+      );
       if (parseRes.success && parseRes.nozzleCumVolumeMl.isNotEmpty) {
         final Map<int, double> litresMap = {};
         parseRes.nozzleCumVolumeMl.forEach((nozzle, ml) {
           litresMap[nozzle] = ml / 1000.0;
         });
 
-        return OcrReceiptExtraction(
+        return record(OcrReceiptExtraction(
           success: true,
           pumpSerialNumber: parseRes.pumpSerialNumber ?? '202501001272',
           fpId: parseRes.fpId ?? '1',
@@ -67,17 +94,23 @@ class OcrService {
           confidence: parseRes.confidence,
           isStrictMatch: parseRes.confidence >= 0.8,
           auditLog: parseRes.auditLog,
-        );
+          engineUsed: currentEngine,
+          durationMs: duration,
+          underlyingEngineError: engineError,
+        ));
       } else {
         // If ML Kit extracted text but it failed pattern validation or has no CumVolume:
         // Do NOT silently return mock data! Return failure so attendant is alerted.
-        return OcrReceiptExtraction(
+        return record(OcrReceiptExtraction(
           success: false,
           rawText: extractedText,
           errorMessage: parseRes.errorMessage ??
               'Receipt text was captured but could not isolate CumVolume readings. Please verify the receipt printout is clean and legible.',
           auditLog: parseRes.auditLog,
-        );
+          engineUsed: currentEngine,
+          durationMs: duration,
+          underlyingEngineError: engineError,
+        ));
       }
     }
 
@@ -130,7 +163,7 @@ CumVolume: /
 275912.820
 CumSale :27916133.280
 ''';
-      return const OcrReceiptExtraction(
+      return record(OcrReceiptExtraction(
         success: true,
         pumpSerialNumber: '202501001272',
         fpId: '1',
@@ -147,7 +180,10 @@ CumSale :27916133.280
         rawText: oct10Text,
         confidence: 1.0,
         isStrictMatch: true,
-      );
+        engineUsed: '$currentEngine (Test Fixture)',
+        durationMs: duration,
+        underlyingEngineError: engineError,
+      ));
     }
 
     final bool isPump2Image = imagePath.contains('1289') ||
@@ -174,7 +210,7 @@ CumVolume:
 248910.600
 CumSale : 25400000.00
 ''';
-      return const OcrReceiptExtraction(
+      return record(OcrReceiptExtraction(
         success: true,
         pumpSerialNumber: '202501001289',
         fpId: '2',
@@ -191,7 +227,10 @@ CumSale : 25400000.00
         rawText: p2Text,
         confidence: 1.0,
         isStrictMatch: true,
-      );
+        engineUsed: '$currentEngine (Test Fixture)',
+        durationMs: duration,
+        underlyingEngineError: engineError,
+      ));
     }
 
     // Explicit test asset fixture for unit tests
@@ -220,7 +259,7 @@ CumVolume:
 CumSale : 27916133.280
 ''';
 
-      return const OcrReceiptExtraction(
+      return record(OcrReceiptExtraction(
         success: true,
         pumpSerialNumber: '202501001272',
         fpId: '1',
@@ -237,17 +276,23 @@ CumSale : 27916133.280
         rawText: p1Text,
         confidence: 1.0,
         isStrictMatch: true,
-      );
+        engineUsed: '$currentEngine (Test Fixture)',
+        durationMs: duration,
+        underlyingEngineError: engineError,
+      ));
     }
 
     // Zero-Trust Rule: If a real photo was captured/uploaded but OCR engine could not
     // extract any text, NEVER return silent fake data. Return failure so user is alerted.
-    return const OcrReceiptExtraction(
+    return record(OcrReceiptExtraction(
       success: false,
       rawText: '',
       errorMessage:
           'Could not detect readable text from receipt photo. Ensure the receipt is well-lit, flat, and legible, or confirm values manually.',
       isStrictMatch: false,
-    );
+      engineUsed: currentEngine,
+      durationMs: duration,
+      underlyingEngineError: engineError,
+    ));
   }
 }

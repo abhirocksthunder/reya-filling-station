@@ -1,12 +1,15 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/colors.dart';
 import '../../core/constants/dimensions.dart';
+import '../../core/formatting/currency_formatter.dart';
 import '../../core/formatting/date_formatter.dart';
 import '../../l10n/app_strings.dart';
 import '../../models/pump.dart';
 import '../../models/receipt_scan.dart';
+import '../../services/location_service.dart';
 import '../../services/station_state_provider.dart';
 import 'package:image_picker/image_picker.dart';
 import '../common/pagination_control.dart';
@@ -21,6 +24,7 @@ class ReceiptInboxScreen extends StatefulWidget {
 class _ReceiptInboxScreenState extends State<ReceiptInboxScreen> {
   int _selectedIndex = 0;
   int _currentPage = 1;
+  int _mobileTab = 0; // 0: Slips list, 1: Review slip details
   static const int _pageSize = 10;
 
   @override
@@ -40,118 +44,207 @@ class _ReceiptInboxScreenState extends State<ReceiptInboxScreen> {
         ? displayedReceipts[_selectedIndex.clamp(0, displayedReceipts.length - 1)]
         : null;
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header with Add Receipt button
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return LayoutBuilder(
+      builder: (context, screenConstraints) {
+        final isMobile = screenConstraints.maxWidth < 600;
+
+        return SingleChildScrollView(
+          padding: EdgeInsets.all(isMobile ? 14 : 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              // Responsive Header with Add Receipt button
+              Wrap(
+                spacing: 12,
+                runSpacing: 10,
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  Text(
-                    AppStrings.get('receiptInbox', lang),
-                    style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: StationColors.textDark),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        AppStrings.get('receiptInbox', lang),
+                        style: TextStyle(fontSize: isMobile ? 22 : 26, fontWeight: FontWeight.w800, color: StationColors.textDark),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        AppStrings.get('pumpTotaliserPhotos', lang),
+                        style: const TextStyle(fontSize: 13, color: StationColors.textMedium),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    AppStrings.get('pumpTotaliserPhotos', lang),
-                    style: const TextStyle(fontSize: 14, color: StationColors.textMedium),
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text('+ Add receipt', style: TextStyle(fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: StationColors.primary,
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size(44, 44),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    onPressed: () => _showAddReceiptDialog(context, state),
                   ),
                 ],
               ),
-              ElevatedButton.icon(
-                icon: const Icon(Icons.add, size: 18),
-                label: const Text('+ Add receipt', style: TextStyle(fontWeight: FontWeight.bold)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: StationColors.primary,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              const SizedBox(height: 20),
+
+              // Empty state or Two-Column / Mobile Segmented Layout
+              if (totalItems == 0)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 56),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(StationDimensions.cardRadius),
+                    border: Border.all(color: StationColors.divider),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: StationColors.primaryLight.withOpacity(0.12),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.receipt_long_outlined, size: 48, color: StationColors.primary),
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'No receipts recorded yet',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: StationColors.textDark),
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        'When shift staff scan pump totalisers or owners upload receipt images, original records will appear here.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 13, color: StationColors.textMedium),
+                      ),
+                    ],
+                  ),
+                )
+              else
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    bool isWide = constraints.maxWidth > 800;
+
+                    if (!isWide) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Mobile Segmented Switch
+                          Container(
+                            margin: const EdgeInsets.only(bottom: 16),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            padding: const EdgeInsets.all(4),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: InkWell(
+                                    onTap: () => setState(() => _mobileTab = 0),
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(vertical: 8),
+                                      decoration: BoxDecoration(
+                                        color: _mobileTab == 0 ? Colors.white : Colors.transparent,
+                                        borderRadius: BorderRadius.circular(8),
+                                        boxShadow: _mobileTab == 0
+                                            ? [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 4, offset: const Offset(0, 2))]
+                                            : null,
+                                      ),
+                                      child: Center(
+                                        child: Text(
+                                          'Slips ($totalItems)',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 13,
+                                            color: _mobileTab == 0 ? StationColors.primary : StationColors.textMedium,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                Expanded(
+                                  child: InkWell(
+                                    onTap: () => setState(() => _mobileTab = 1),
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(vertical: 8),
+                                      decoration: BoxDecoration(
+                                        color: _mobileTab == 1 ? Colors.white : Colors.transparent,
+                                        borderRadius: BorderRadius.circular(8),
+                                        boxShadow: _mobileTab == 1
+                                            ? [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 4, offset: const Offset(0, 2))]
+                                            : null,
+                                      ),
+                                      child: Center(
+                                        child: Text(
+                                          'Review Slip',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 13,
+                                            color: _mobileTab == 1 ? StationColors.primary : StationColors.textMedium,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (_mobileTab == 0)
+                            _buildReceiptsList(displayedReceipts, totalItems, isMobile: true)
+                          else ...[
+                            TextButton.icon(
+                              onPressed: () => setState(() => _mobileTab = 0),
+                              icon: const Icon(Icons.arrow_back, size: 16),
+                              label: const Text('← Back to slips list', style: TextStyle(fontWeight: FontWeight.bold)),
+                              style: TextButton.styleFrom(
+                                foregroundColor: StationColors.primary,
+                                minimumSize: const Size(44, 44),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            if (selectedScan != null)
+                              _buildReviewPane(context, selectedScan, lang),
+                          ],
+                        ],
+                      );
+                    }
+
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Left List
+                        SizedBox(
+                          width: 320,
+                          child: _buildReceiptsList(displayedReceipts, totalItems),
+                        ),
+                        const SizedBox(width: 20),
+                        // Right Detail Pane
+                        Expanded(
+                          child: selectedScan != null
+                              ? _buildReviewPane(context, selectedScan, lang)
+                              : const SizedBox(),
+                        ),
+                      ],
+                    );
+                  },
                 ),
-                onPressed: () => _showAddReceiptDialog(context, state),
-              ),
             ],
           ),
-          const SizedBox(height: 24),
-
-          // Empty state or Two-Column Layout
-          if (totalItems == 0)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 56),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(StationDimensions.cardRadius),
-                border: Border.all(color: StationColors.divider),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: StationColors.primaryLight.withOpacity(0.12),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.receipt_long_outlined, size: 48, color: StationColors.primary),
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'No receipts recorded yet',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: StationColors.textDark),
-                  ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    'When shift staff scan pump totalisers or owners upload receipt images, original records will appear here.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 13, color: StationColors.textMedium),
-                  ),
-                ],
-              ),
-            )
-          else
-            LayoutBuilder(
-              builder: (context, constraints) {
-                bool isWide = constraints.maxWidth > 800;
-
-                if (!isWide) {
-                  return Column(
-                    children: [
-                      _buildReceiptsList(displayedReceipts, totalItems),
-                      const SizedBox(height: 20),
-                      if (selectedScan != null) _buildReviewPane(context, selectedScan, lang),
-                    ],
-                  );
-                }
-
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Left List
-                    SizedBox(
-                      width: 320,
-                      child: _buildReceiptsList(displayedReceipts, totalItems),
-                    ),
-                    const SizedBox(width: 20),
-                    // Right Detail Pane
-                    Expanded(
-                      child: selectedScan != null
-                          ? _buildReviewPane(context, selectedScan, lang)
-                          : const SizedBox(),
-                    ),
-                  ],
-                );
-              },
-            ),
-        ],
-      ),
+        );
+      },
     );
   }
 
-  Widget _buildReceiptsList(List<ReceiptScan> receipts, int totalItems) {
+  Widget _buildReceiptsList(List<ReceiptScan> receipts, int totalItems, {bool isMobile = false}) {
     return Column(
       children: [
         Container(
@@ -181,7 +274,12 @@ class _ReceiptInboxScreenState extends State<ReceiptInboxScreen> {
               bool isSelected = i == _selectedIndex;
 
               return InkWell(
-                onTap: () => setState(() => _selectedIndex = i),
+                onTap: () {
+                  setState(() {
+                    _selectedIndex = i;
+                    if (isMobile) _mobileTab = 1;
+                  });
+                },
                 child: Container(
                   color: isSelected ? StationColors.primaryLight.withOpacity(0.08) : Colors.transparent,
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -407,6 +505,16 @@ class _ReceiptInboxScreenState extends State<ReceiptInboxScreen> {
                   _buildMetaRow('Date on receipt', scan.printedDate),
                   _buildMetaRow('Time on receipt', scan.printedTime),
                   _buildMetaRow('Time received', DateFormatter.formatDisplayDateTime(scan.capturedAt)),
+                  _buildMetaRow(
+                    'Scan GPS Location',
+                    '${scan.scanLocationName ?? (scan.scanLatitude != null && scan.scanLongitude != null ? state.resolveCoordinateLocationName(scan.scanLatitude!, scan.scanLongitude!) : state.settings.stationName)} • ${scan.locationVerified ? "At Station" : "Outside"} (${scan.distanceMeters.toStringAsFixed(1)}m)${scan.scanLatitude != null && scan.scanLongitude != null ? " • ${scan.scanLatitude!.toStringAsFixed(4)}°N, ${scan.scanLongitude!.toStringAsFixed(4)}°E" : ""}',
+                    onTap: scan.scanLatitude != null && scan.scanLongitude != null
+                        ? () => LocationService.openInGoogleMaps(
+                              lat: scan.scanLatitude!,
+                              lon: scan.scanLongitude!,
+                            )
+                        : null,
+                  ),
                   _buildMetaRow('Audit Check', 'Dynamic IndianOil Format Confirmed'),
                   const SizedBox(height: 16),
                   // Table
@@ -422,18 +530,37 @@ class _ReceiptInboxScreenState extends State<ReceiptInboxScreen> {
                           children: [
                             Padding(padding: EdgeInsets.all(8), child: Text('Nozzle', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
                             Padding(padding: EdgeInsets.all(8), child: Text('Cumulative volume (L)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
+                            Padding(padding: EdgeInsets.all(8), child: Text('Rate (₹/L)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
                           ],
                         ),
                         TableRow(
                           children: [
                             const Padding(padding: EdgeInsets.all(8), child: Text('Nozzle 1', style: TextStyle(fontSize: 13))),
                             Padding(padding: const EdgeInsets.all(8), child: Text(scan.formattedVolume(1), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
+                            Padding(
+                              padding: const EdgeInsets.all(8),
+                              child: Text(
+                                scan.nozzleRatesPaisePerLitre?[1] != null
+                                    ? CurrencyFormatter.formatPaise(scan.nozzleRatesPaisePerLitre![1]!)
+                                    : '₹105.71',
+                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: StationColors.textDark),
+                              ),
+                            ),
                           ],
                         ),
                         TableRow(
                           children: [
                             const Padding(padding: EdgeInsets.all(8), child: Text('Nozzle 2', style: TextStyle(fontSize: 13))),
                             Padding(padding: const EdgeInsets.all(8), child: Text(scan.formattedVolume(2), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
+                            Padding(
+                              padding: const EdgeInsets.all(8),
+                              child: Text(
+                                scan.nozzleRatesPaisePerLitre?[2] != null
+                                    ? CurrencyFormatter.formatPaise(scan.nozzleRatesPaisePerLitre![2]!)
+                                    : '₹98.50',
+                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: StationColors.textDark),
+                              ),
+                            ),
                           ],
                         ),
                       ],
@@ -616,7 +743,7 @@ class _ReceiptInboxScreenState extends State<ReceiptInboxScreen> {
     );
   }
 
-  Widget _buildMetaRow(String key, String value, {bool isLocation = false}) {
+  Widget _buildMetaRow(String key, String value, {bool isLocation = false, VoidCallback? onTap}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -628,14 +755,27 @@ class _ReceiptInboxScreenState extends State<ReceiptInboxScreen> {
           ),
           Text(': ', style: const TextStyle(fontSize: 13, color: StationColors.textLight)),
           Expanded(
-            child: Text(
-              value,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: isLocation ? FontWeight.normal : FontWeight.w600,
-                color: isLocation ? Colors.orange[800] : StationColors.textDark,
-              ),
-            ),
+            child: onTap != null
+                ? InkWell(
+                    onTap: onTap,
+                    child: Text(
+                      value,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: StationColors.primary,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  )
+                : Text(
+                    value,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: isLocation ? FontWeight.normal : FontWeight.w600,
+                      color: isLocation ? Colors.orange[800] : StationColors.textDark,
+                    ),
+                  ),
           ),
         ],
       ),
@@ -667,6 +807,16 @@ class _ReceiptInboxScreenState extends State<ReceiptInboxScreen> {
       text: selectedPump.nozzles.length > 1
           ? (selectedPump.nozzles[1].currentTotaliserMl / 1000.0).toStringAsFixed(3)
           : '',
+    );
+    final n1RateCtrl = TextEditingController(
+      text: selectedPump.nozzles.isNotEmpty
+          ? (selectedPump.nozzles[0].ratePaisePerLitre / 100.0).toStringAsFixed(2)
+          : '105.71',
+    );
+    final n2RateCtrl = TextEditingController(
+      text: selectedPump.nozzles.length > 1
+          ? (selectedPump.nozzles[1].ratePaisePerLitre / 100.0).toStringAsFixed(2)
+          : '98.50',
     );
 
     String? pickedPhotoName;
@@ -702,9 +852,11 @@ class _ReceiptInboxScreenState extends State<ReceiptInboxScreen> {
                           selectedPump = pumps.firstWhere((p) => p.id == val);
                           if (selectedPump.nozzles.isNotEmpty) {
                             n1Ctrl.text = (selectedPump.nozzles[0].currentTotaliserMl / 1000.0).toStringAsFixed(3);
+                            n1RateCtrl.text = (selectedPump.nozzles[0].ratePaisePerLitre / 100.0).toStringAsFixed(2);
                           }
                           if (selectedPump.nozzles.length > 1) {
                             n2Ctrl.text = (selectedPump.nozzles[1].currentTotaliserMl / 1000.0).toStringAsFixed(3);
+                            n2RateCtrl.text = (selectedPump.nozzles[1].ratePaisePerLitre / 100.0).toStringAsFixed(2);
                           }
                         });
                       }
@@ -793,35 +945,81 @@ class _ReceiptInboxScreenState extends State<ReceiptInboxScreen> {
                   ),
                   const SizedBox(height: 14),
 
-                  TextField(
-                    controller: n1Ctrl,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    maxLength: 15,
-                    inputFormatters: [LengthLimitingTextInputFormatter(15)],
-                    decoration: InputDecoration(
-                      labelText: selectedPump.nozzles.isNotEmpty
-                          ? 'Nozzle 1 (${selectedPump.nozzles[0].fuelType}) Litres'
-                          : 'Nozzle 1 Litres',
-                      counterText: '',
-                      isDense: true,
-                      border: const OutlineInputBorder(),
-                    ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: n1Ctrl,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          maxLength: 15,
+                          inputFormatters: [LengthLimitingTextInputFormatter(15)],
+                          decoration: InputDecoration(
+                            labelText: selectedPump.nozzles.isNotEmpty
+                                ? 'N1 (${selectedPump.nozzles[0].fuelType}) Litres'
+                                : 'Nozzle 1 Litres',
+                            counterText: '',
+                            isDense: true,
+                            border: const OutlineInputBorder(),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: TextField(
+                          controller: n1RateCtrl,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          maxLength: 10,
+                          inputFormatters: [LengthLimitingTextInputFormatter(10)],
+                          decoration: const InputDecoration(
+                            labelText: 'N1 Rate (₹/L)',
+                            prefixText: '₹ ',
+                            helperText: 'Update if changed',
+                            counterText: '',
+                            isDense: true,
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 12),
 
-                  TextField(
-                    controller: n2Ctrl,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    maxLength: 15,
-                    inputFormatters: [LengthLimitingTextInputFormatter(15)],
-                    decoration: InputDecoration(
-                      labelText: selectedPump.nozzles.length > 1
-                          ? 'Nozzle 2 (${selectedPump.nozzles[1].fuelType}) Litres'
-                          : 'Nozzle 2 Litres',
-                      counterText: '',
-                      isDense: true,
-                      border: const OutlineInputBorder(),
-                    ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: n2Ctrl,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          maxLength: 15,
+                          inputFormatters: [LengthLimitingTextInputFormatter(15)],
+                          decoration: InputDecoration(
+                            labelText: selectedPump.nozzles.length > 1
+                                ? 'N2 (${selectedPump.nozzles[1].fuelType}) Litres'
+                                : 'Nozzle 2 Litres',
+                            counterText: '',
+                            isDense: true,
+                            border: const OutlineInputBorder(),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: TextField(
+                          controller: n2RateCtrl,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          maxLength: 10,
+                          inputFormatters: [LengthLimitingTextInputFormatter(10)],
+                          decoration: const InputDecoration(
+                            labelText: 'N2 Rate (₹/L)',
+                            prefixText: '₹ ',
+                            helperText: 'Update if changed',
+                            counterText: '',
+                            isDense: true,
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -846,6 +1044,15 @@ class _ReceiptInboxScreenState extends State<ReceiptInboxScreen> {
                   return;
                 }
 
+                final double? r1 = double.tryParse(n1RateCtrl.text);
+                final double? r2 = double.tryParse(n2RateCtrl.text);
+                final int rate1Paise = r1 != null && r1 > 0
+                    ? (r1 * 100).round()
+                    : (selectedPump.nozzles.isNotEmpty ? selectedPump.nozzles[0].ratePaisePerLitre : 10571);
+                final int rate2Paise = r2 != null && r2 > 0
+                    ? (r2 * 100).round()
+                    : (selectedPump.nozzles.length > 1 ? selectedPump.nozzles[1].ratePaisePerLitre : 9850);
+
                 final newScan = ReceiptScan(
                   id: 'scan_${DateTime.now().millisecondsSinceEpoch}',
                   pumpSerialNumber: selectedPump.serialNumber,
@@ -856,7 +1063,11 @@ class _ReceiptInboxScreenState extends State<ReceiptInboxScreen> {
                     1: (n1 * 1000).round(),
                     2: (n2 * 1000).round(),
                   },
-                  imagePath: selectedPump.referenceReceiptAsset ?? 'assets/images/media_1791616403909.jpg',
+                  nozzleRatesPaisePerLitre: {
+                    1: rate1Paise,
+                    2: rate2Paise,
+                  },
+                  imagePath: selectedPump.referenceReceiptAsset ?? 'assets/images/media_1791634198035.png',
                   validationStatus: ReceiptValidationStatus.valid,
                   reviewStatus: 'approved',
                   statusMessage: 'Direct owner totaliser receipt recorded.',
@@ -950,11 +1161,27 @@ class _ReceiptInboxScreenState extends State<ReceiptInboxScreen> {
     if (imagePath.startsWith('http')) {
       return Image.network(imagePath, fit: BoxFit.contain);
     }
+    if (imagePath.startsWith('data:image')) {
+      try {
+        final commaIndex = imagePath.indexOf(',');
+        final base64Data = commaIndex != -1 ? imagePath.substring(commaIndex + 1) : imagePath;
+        final bytes = base64Decode(base64Data);
+        return Image.memory(bytes, fit: BoxFit.contain);
+      } catch (e) {
+        // Fallback to asset
+      }
+    }
+    if (!imagePath.startsWith('assets/') && imagePath.length > 200) {
+      try {
+        final bytes = base64Decode(imagePath);
+        return Image.memory(bytes, fit: BoxFit.contain);
+      } catch (_) {}
+    }
     if (imagePath.startsWith('assets/')) {
       return Image.asset(imagePath, fit: BoxFit.contain);
     }
     return Image.asset(
-      'assets/images/media_1791616403909.jpg',
+      'assets/images/media_1791634198035.png',
       fit: BoxFit.contain,
       errorBuilder: (context, error, stackTrace) {
         return const Center(

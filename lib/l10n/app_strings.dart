@@ -1,7 +1,7 @@
 class AppStrings {
   static const Map<String, Map<String, String>> _strings = {
     'en': {
-      'appName': 'Reya Filling Station',
+      'appName': 'RFS',
       'demoSampleData': '',
       'atStation': 'At station',
       'outsideStation': 'Outside station',
@@ -95,7 +95,7 @@ class AppStrings {
       'serialNumber': 'Serial number',
     },
     'te': {
-      'appName': 'రేయా ఫిల్లింగ్ స్టేషన్',
+      'appName': 'RFS',
       'demoSampleData': '',
       'atStation': 'బంకు వద్ద ఉన్నారు',
       'outsideStation': 'బంకు వెలుపల',

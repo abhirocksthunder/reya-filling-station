@@ -7,6 +7,7 @@ void main() {
   group('Money Ledger Dynamic Aggregation & Filter Tests', () {
     test('1. Dynamically aggregates forecourt entries into ledger totals', () {
       final state = StationStateProvider();
+      final today = DateTime.now();
 
       // Clear any residual
       expect(state.entries, isEmpty);
@@ -18,8 +19,8 @@ void main() {
         category: EntryCategory.cash,
         direction: EntryDirection.received,
         amountPaise: 500000, // ₹5,000
-        createdAt: DateTime(2026, 10, 10, 9, 30),
-        createdBy: 'Srikanth',
+        createdAt: today,
+        createdBy: 'Srinivas',
       ));
 
       // Add PhonePe entry with mobile number
@@ -30,8 +31,8 @@ void main() {
         direction: EntryDirection.received,
         amountPaise: 120000, // ₹1,200
         phonePeNumber: '9848011111',
-        createdAt: DateTime(2026, 10, 10, 10, 15),
-        createdBy: 'Srikanth',
+        createdAt: today,
+        createdBy: 'Srinivas',
       ));
 
       // Add Expense Paid Out entry
@@ -42,8 +43,8 @@ void main() {
         direction: EntryDirection.paidOut,
         amountPaise: 40000, // ₹400
         reference: 'food & curries',
-        createdAt: DateTime(2026, 10, 10, 13, 0),
-        createdBy: 'Kishore',
+        createdAt: today,
+        createdBy: 'Srinivas',
       ));
 
       expect(state.entries.length, equals(3));
@@ -169,6 +170,65 @@ void main() {
 
       const validMeterReading = '169923.72';
       expect(validMeterReading.length <= maxMeterLength, isTrue);
+    });
+  });
+
+  group('Money Entries Edit & Ordering Tests', () {
+    test('6. Updates existing transaction entry and preserves history', () {
+      final state = StationStateProvider();
+      final original = TransactionEntry(
+        id: 'entry_edit_test',
+        shiftId: 'shift_morning',
+        category: EntryCategory.phonePe,
+        direction: EntryDirection.received,
+        amountPaise: 50000,
+        phonePeNumber: '9848011111',
+        createdAt: DateTime(2026, 10, 10, 8, 30),
+        createdBy: 'Srikanth',
+      );
+      state.addTransactionEntry(original);
+      expect(state.entries.any((e) => e.id == 'entry_edit_test'), isTrue);
+
+      final updated = original.copyWith(
+        amountPaise: 75000,
+        reference: 'Updated note',
+      );
+      state.updateTransactionEntry(updated);
+
+      final saved = state.entries.firstWhere((e) => e.id == 'entry_edit_test');
+      expect(saved.amountPaise, equals(75000));
+      expect(saved.reference, equals('Updated note'));
+    });
+
+    test('7. Sorts money entries latest first by createdAt', () {
+      final e1 = TransactionEntry(
+        id: 'e1',
+        shiftId: 'shift_1',
+        category: EntryCategory.cash,
+        direction: EntryDirection.received,
+        amountPaise: 10000,
+        createdAt: DateTime(2026, 10, 10, 8, 0),
+        createdBy: 'Srikanth',
+      );
+      final e2 = TransactionEntry(
+        id: 'e2',
+        shiftId: 'shift_1',
+        category: EntryCategory.cash,
+        direction: EntryDirection.received,
+        amountPaise: 20000,
+        createdAt: DateTime(2026, 10, 10, 10, 30),
+        createdBy: 'Srikanth',
+      );
+      final list = [e1, e2]..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      expect(list.first.id, equals('e2'));
+      expect(list.last.id, equals('e1'));
+    });
+
+    test('8. Reconciliation handles 0 volume without throwing ArgumentError', () {
+      final state = StationStateProvider();
+      expect(() => state.sampleShiftReport, returnsNormally);
+      final report = state.sampleShiftReport;
+      expect(report, isNotNull);
     });
   });
 }

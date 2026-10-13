@@ -89,6 +89,34 @@ class TransactionEntry {
     this.status = 'active',
   });
 
+  TransactionEntry copyWith({
+    String? id,
+    String? shiftId,
+    EntryCategory? category,
+    EntryDirection? direction,
+    int? amountPaise,
+    String? phonePeNumber,
+    String? timeString,
+    String? reference,
+    DateTime? createdAt,
+    String? createdBy,
+    String? status,
+  }) {
+    return TransactionEntry(
+      id: id ?? this.id,
+      shiftId: shiftId ?? this.shiftId,
+      category: category ?? this.category,
+      direction: direction ?? this.direction,
+      amountPaise: amountPaise ?? this.amountPaise,
+      phonePeNumber: phonePeNumber ?? this.phonePeNumber,
+      timeString: timeString ?? this.timeString,
+      reference: reference ?? this.reference,
+      createdAt: createdAt ?? this.createdAt,
+      createdBy: createdBy ?? this.createdBy,
+      status: status ?? this.status,
+    );
+  }
+
   String get formattedAmount => CurrencyFormatter.formatPaise(amountPaise);
 
   Map<String, dynamic> toMap() {

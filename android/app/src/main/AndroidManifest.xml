@@ -17,7 +17,10 @@
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         
-        <!-- ML Kit Bundled OCR Latin Model (Enables offline recognition on first app launch) -->
+        <!-- Google ML Kit On-Device Latin OCR Model Auto-Download -->
+        <meta-data
+            android:name="com.google.mlkit.vision.DEPENDENCIES"
+            android:value="ocr" />
         <meta-data
             android:name="com.google.firebase.ml.vision.DEPENDENCIES"
             android:value="ocr" />

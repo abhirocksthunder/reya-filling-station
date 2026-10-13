@@ -6,7 +6,10 @@ import '../../core/formatting/currency_formatter.dart';
 import '../../core/formatting/date_formatter.dart';
 import '../../core/formatting/volume_formatter.dart';
 import '../../l10n/app_strings.dart';
+import '../../models/user_profile.dart';
+import '../../services/location_service.dart';
 import '../../services/station_state_provider.dart';
+import '../../widgets/version_footer.dart';
 
 class MyShiftScreen extends StatelessWidget {
   final Function(int) onTabChange;
@@ -20,6 +23,11 @@ class MyShiftScreen extends StatelessWidget {
     final shift = state.activeShift;
     final user = state.currentUser;
     final isInsideGeofence = state.simulateInsideGeofence;
+    final isShiftInProgress = state.isUserShiftInProgress(user);
+    final isTrackingEnabled = state.settings.enableLiveLocationTracking;
+    final userLat = user.lastLatitude ?? state.settings.latitude;
+    final userLon = user.lastLongitude ?? state.settings.longitude;
+    final locationName = state.resolveUserLocationName(user);
 
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
@@ -37,58 +45,123 @@ class MyShiftScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 4),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              Expanded(
-                child: Text(
-                  '${shift.shiftName} • ${shift.businessDate}',
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: StationColors.textMedium,
-                  ),
-                  overflow: TextOverflow.ellipsis,
+              Text(
+                '${shift.shiftName} • ${shift.businessDate}',
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: StationColors.textMedium,
                 ),
               ),
-              const SizedBox(width: 8),
-              OutlinedButton.icon(
-                icon: const Icon(Icons.schedule, size: 14),
-                label: const Text('Change shift', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  minimumSize: const Size(60, 32),
-                  side: const BorderSide(color: StationColors.primary),
-                  foregroundColor: StationColors.primary,
-                ),
-                onPressed: () => _showShiftTimingRequestDialog(context, state, user),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  if (!isShiftInProgress) ...[
+                    ElevatedButton.icon(
+                      icon: const Icon(Icons.play_arrow_rounded, size: 15, color: Colors.white),
+                      label: const Text('Start shift', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: StationColors.successGreen,
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        minimumSize: const Size(60, 44),
+                      ),
+                      onPressed: () {
+                        state.startCurrentUserShift();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Shift started. Live location tracking is active until shift close.'),
+                            backgroundColor: StationColors.successGreen,
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.schedule, size: 14),
+                    label: const Text('Change shift', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      minimumSize: const Size(60, 44),
+                      side: const BorderSide(color: StationColors.primary),
+                      foregroundColor: StationColors.primary,
+                    ),
+                    onPressed: () => _showShiftTimingRequestDialog(context, state, user),
+                  ),
+                ],
               ),
             ],
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
 
-          // Geofence Station Badge
+          // Geofence & Clickable Google Maps Location Badge
           Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  color: isInsideGeofence ? StationColors.successGreen : StationColors.errorRed,
-                  shape: BoxShape.circle,
+              Expanded(
+                child: InkWell(
+                  onTap: () => LocationService.openInGoogleMaps(
+                    lat: userLat,
+                    lon: userLon,
+                  ),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: isInsideGeofence
+                          ? StationColors.successGreen.withOpacity(0.08)
+                          : StationColors.errorRed.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: isInsideGeofence
+                            ? StationColors.successGreen.withOpacity(0.35)
+                            : StationColors.errorRed.withOpacity(0.35),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.location_on_rounded,
+                          size: 15,
+                          color: isInsideGeofence ? StationColors.successGreen : StationColors.errorRed,
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            !isTrackingEnabled
+                                ? '$locationName • Location tracking off'
+                                : !isShiftInProgress
+                                    ? '$locationName • Shift closed (tracking paused)'
+                                    : '${isInsideGeofence ? AppStrings.get('atStation', lang) : AppStrings.get('outsideStation', lang)} • $locationName (${userLat.toStringAsFixed(4)}°N, ${userLon.toStringAsFixed(4)}°E)',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: isInsideGeofence ? StationColors.successGreen : StationColors.errorRed,
+                              decoration: TextDecoration.underline,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(
+                          Icons.open_in_new_rounded,
+                          size: 13,
+                          color: isInsideGeofence ? StationColors.successGreen : StationColors.errorRed,
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
-              const SizedBox(width: 6),
-              Text(
-                isInsideGeofence
-                    ? AppStrings.get('atStation', lang)
-                    : AppStrings.get('outsideStation', lang),
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: isInsideGeofence ? StationColors.successGreen : StationColors.errorRed,
-                ),
-              ),
+              const SizedBox(width: 8),
+              const VersionFooter(compact: true),
             ],
           ),
           const SizedBox(height: 20),
@@ -199,6 +272,58 @@ class MyShiftScreen extends StatelessWidget {
               ),
             ),
           ),
+          if (state.canAccessScreen('people_management')) ...[
+            const SizedBox(height: 14),
+            InkWell(
+              onTap: () => onTabChange(4), // Switch to Users tab in StaffShell
+              borderRadius: BorderRadius.circular(StationDimensions.cardRadius),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(StationDimensions.cardRadius),
+                  border: Border.all(color: StationColors.primary.withOpacity(0.35), width: 1.5),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: StationColors.primary.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.group_add_rounded, color: StationColors.primary, size: 24),
+                    ),
+                    const SizedBox(width: 14),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Add / Update Users & Share APK',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: StationColors.textDark,
+                            ),
+                          ),
+                          SizedBox(height: 2),
+                          Text(
+                            'Submit new/updated staff for Owner approval & share app link',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: StationColors.textMedium,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.chevron_right_rounded, color: StationColors.primary),
+                  ],
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 24),
 
           // Last Recorded Readings Card
@@ -419,7 +544,9 @@ class MyShiftScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  CurrencyFormatter.formatPaise(shift.cashHandoverPaise),
+                  CurrencyFormatter.formatPaise(
+                    state.getShiftHandoverToOwnerPaise(shift, date: DateTime.now()),
+                  ),
                   style: const TextStyle(
                     fontSize: 34,
                     fontWeight: FontWeight.w900,

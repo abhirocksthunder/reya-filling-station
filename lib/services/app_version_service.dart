@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:url_launcher/url_launcher.dart';
+import '../core/utils/url_launcher_helper.dart';
 import '../models/station_settings.dart';
 import '../widgets/force_update_dialog.dart';
 
 class AppVersionService {
-  static const String fallbackVersion = '1.0.4';
-  static const int fallbackBuildNumber = 5;
+  static const String fallbackVersion = '1.0.33';
+  static const int fallbackBuildNumber = 34;
 
   static String _version = fallbackVersion;
   static int _buildNumber = fallbackBuildNumber;
@@ -17,15 +17,27 @@ class AppVersionService {
   static int get buildNumber => _buildNumber;
   static String get displayVersion => 'v$_version+$_buildNumber';
 
+  static String defaultHostedApkUrl([String? ver, int? build]) {
+    final v = (ver != null && ver.trim().isNotEmpty) ? ver.trim() : fallbackVersion;
+    final b = build ?? fallbackBuildNumber;
+    return 'https://reya-filling-station-chatrai.web.app/static/reya-filling-station-v$v+$b.apk';
+  }
+
   static Future<void> init() async {
     if (_initialized) return;
+    if (kIsWeb) {
+      // In web browser, avoid PackageInfo platform channel which throws MissingPluginException
+      _version = fallbackVersion;
+      _buildNumber = fallbackBuildNumber;
+      _initialized = true;
+      return;
+    }
     try {
       final info = await PackageInfo.fromPlatform();
       _version = info.version.isNotEmpty ? info.version : fallbackVersion;
       _buildNumber = int.tryParse(info.buildNumber) ?? fallbackBuildNumber;
       _initialized = true;
     } catch (e) {
-      debugPrint('AppVersionService: PackageInfo fallback used ($e)');
       _version = fallbackVersion;
       _buildNumber = fallbackBuildNumber;
       _initialized = true;
@@ -79,44 +91,70 @@ class AppVersionService {
     return isUpdateAvailable(settings);
   }
 
-  /// Formats the complete download URL (resolving local IPs or relative paths)
-  static String resolveDownloadUrl(String rawUrl) {
-    if (rawUrl.isEmpty) {
-      return '/static/reya-filling-station.apk';
+  /// Formats the complete download URL with the version embedded in the filename/query
+  static String resolveDownloadUrl(
+    String rawUrl, {
+    String? version,
+    int? buildNumber,
+  }) {
+    final ver = (version != null && version.trim().isNotEmpty) ? version.trim() : fallbackVersion;
+    final build = buildNumber ?? fallbackBuildNumber;
+    final clean = rawUrl.trim();
+
+    if (clean.isEmpty) {
+      return defaultHostedApkUrl(ver, build);
     }
-    return rawUrl;
+
+    // Upgrade unversioned or older versioned official hosting APK path to current target version
+    if (clean.contains('/static/reya-filling-station') && clean.contains('.apk')) {
+      final prefix = clean.startsWith('http')
+          ? clean.substring(0, clean.indexOf('/static/reya-filling-station'))
+          : 'https://reya-filling-station-chatrai.web.app';
+      return '$prefix/static/reya-filling-station-v$ver+$build.apk';
+    }
+
+    return clean;
   }
 
   static bool _dialogShowing = false;
+  static String? _lastPromptedVersionKey;
 
-  /// Checks if an update is required and prompts the user
+  /// Checks if an update is available/required and prompts the user in real time
   static Future<void> checkAndPromptUpdate(
     BuildContext context,
     StationSettings settings,
   ) async {
+    // Web clients are continuously updated via Firebase Hosting; APK force updates are scoped to mobile
+    if (kIsWeb) return;
     await init();
     if (_dialogShowing) return;
-    if (isForceUpdateRequired(settings)) {
+    if (isUpdateAvailable(settings)) {
+      final versionKey = '${settings.latestVersion}+${settings.latestBuildNumber}_${settings.forceUpdate}';
+      if (!settings.forceUpdate && _lastPromptedVersionKey == versionKey) {
+        return;
+      }
       _dialogShowing = true;
+      _lastPromptedVersionKey = versionKey;
       if (context.mounted) {
-        // Dynamic import / call to avoid cyclic dependency
-        await ForceUpdateDialog.show(context, settings);
+        await ForceUpdateDialog.show(
+          context,
+          settings,
+          previewMode: !settings.forceUpdate,
+        );
+        _dialogShowing = false;
+      } else {
         _dialogShowing = false;
       }
     }
   }
 
-  /// Opens the APK download URL in browser/download manager
-  static Future<bool> launchDownload(String url) async {
-    try {
-      final uri = Uri.parse(resolveDownloadUrl(url));
-      return await launchUrl(
-        uri,
-        mode: LaunchMode.externalApplication,
-      );
-    } catch (e) {
-      debugPrint('Failed to launch update URL: $e');
-      return false;
-    }
+  /// Opens the APK download URL in browser/download manager safely across platforms
+  static Future<bool> launchDownload(
+    String url, {
+    String? version,
+    int? buildNumber,
+  }) async {
+    final fullUrl = resolveDownloadUrl(url, version: version, buildNumber: buildNumber);
+    return await UrlLauncherHelper.launchUniversalUrl(fullUrl);
   }
 }

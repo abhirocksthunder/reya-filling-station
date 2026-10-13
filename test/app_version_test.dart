@@ -25,21 +25,38 @@ void main() {
 
     test('5. Evaluates StationSettings forceUpdate policy', () {
       const activeSettings = StationSettings(
-        latestVersion: '1.0.5',
-        latestBuildNumber: 6,
+        latestVersion: AppVersionService.fallbackVersion,
+        latestBuildNumber: AppVersionService.fallbackBuildNumber + 1,
         forceUpdate: true,
       );
-      // Compared against fallback 1.0.4+5
+      // A newer base build is independent of any applied OTA patch.
       expect(AppVersionService.isUpdateAvailable(activeSettings), isTrue);
       expect(AppVersionService.isForceUpdateRequired(activeSettings), isTrue);
 
       const optionalSettings = StationSettings(
-        latestVersion: '1.0.5',
-        latestBuildNumber: 6,
+        latestVersion: AppVersionService.fallbackVersion,
+        latestBuildNumber: AppVersionService.fallbackBuildNumber + 1,
         forceUpdate: false,
       );
       expect(AppVersionService.isUpdateAvailable(optionalSettings), isTrue);
       expect(AppVersionService.isForceUpdateRequired(optionalSettings), isFalse);
+    });
+
+    test('Current release does not prompt itself to update', () {
+      expect(AppVersionService.isUpdateAvailable(const StationSettings()), isFalse);
+      expect(AppVersionService.isForceUpdateRequired(const StationSettings()), isFalse);
+    });
+
+    test('6. Embeds version and build number into official APK download link', () {
+      final resolved = AppVersionService.resolveDownloadUrl(
+        'https://reya-filling-station-chatrai.web.app/static/reya-filling-station.apk',
+        version: '1.0.19',
+        buildNumber: 20,
+      );
+      expect(
+        resolved,
+        'https://reya-filling-station-chatrai.web.app/static/reya-filling-station-v1.0.19+20.apk',
+      );
     });
   });
 }

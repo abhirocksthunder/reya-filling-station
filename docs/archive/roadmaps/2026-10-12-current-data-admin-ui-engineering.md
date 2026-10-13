@@ -1,0 +1,3 @@
+# Signed engineering checkpoint; Android QA pending
+
+Implemented persisted/cloud handover purge, actual-record Today/Weekly/Monthly analytics and empty-period state, separate Owner/Admin Roles and Permissions destinations, and desktop side menus with small-viewport footers. Retained all role boundaries and APK v1.0.33+34. 125 Flutter and 20 release-service tests pass; Signed Patch 1 uploaded to staging for base v1.0.33+34; exact artifact awaits Android device QA. No stable promotion or public website deployment. Generated SDK-path metadata does not block Dart compatibility; actual native/assets/dependencies remain enforced.

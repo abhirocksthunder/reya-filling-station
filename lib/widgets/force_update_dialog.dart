@@ -156,6 +156,31 @@ class ForceUpdateDialog extends StatelessWidget {
                 ),
               ),
             ],
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.android_rounded, size: 16, color: StationColors.primary),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'APK Package: reya-filling-station-v$targetVer+$targetBuild.apk',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: StationColors.textMedium,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
             if (previewMode) ...[
               const SizedBox(height: 10),
               const Text(
@@ -179,12 +204,16 @@ class ForceUpdateDialog extends StatelessWidget {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
             icon: const Icon(Icons.download, size: 20),
-            label: const Text(
-              'Update Now · అప్‌డేట్ చేయండి',
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+            label: Text(
+              'Update Now (v$targetVer+$targetBuild) · అప్‌డేట్ చేయండి',
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
             ),
             onPressed: () {
-              AppVersionService.launchDownload(settings.updateUrl);
+              AppVersionService.launchDownload(
+                settings.updateUrl,
+                version: targetVer,
+                buildNumber: targetBuild,
+              );
             },
           ),
         ],

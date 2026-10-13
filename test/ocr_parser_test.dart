@@ -157,5 +157,119 @@ CumSale :27916133.280
       expect(result.nozzleCumVolumeMl[1], equals(171054450)); // 171,054.450 L
       expect(result.nozzleCumVolumeMl[2], equals(275912820)); // 275,912.820 L
     });
+
+    test('6. Parses two-column split header slip (FP. ID :3, Pump SNo :202501001346) from HEIC gallery photo', () {
+      const splitColumnReceipt = '''
+IndianOil
+FP. ID
+Pump SNo
+Date
+Time
+:3
+:2O2501001346
+:10/10/2026
+:20:51:01
+
+Nozzle Noló
+Shif1Sale:7937.380
+Shif1Vol :67.520
+Shif2Sale:12474.000
+Shif2Vol :106.140
+Shif3Sale:12926.350
+Shif3Vol :109.970
+ShDaySale:
+33337.730
+ShDayVol :283.630
+ShMTHSale:
+450641.610
+ShMTHVol :3834.710
+CumVolume:
+86106.490
+CumSale :10038181.010
+
+Nozzle No2
+Shif1Sale:21825.610
+Shif1Vol :207.430
+Shif2Sale:22490.000
+Shif2Vol :213.720
+Shif3Sale:17995.770
+Shif3Vol :171.030
+ShDaySale:
+62311.380
+ShDayVol :592.180
+ShMTHSale:
+580004.620
+ShMTHVol :5512.540
+CumVolume:
+125635.400
+CumSale :12987914.750
+''';
+
+      final result = OcrParserService.parseIndianOilReceipt(splitColumnReceipt);
+      expect(result.success, isTrue);
+      expect(result.pumpSerialNumber, equals('202501001346'));
+      expect(result.fpId, equals('3'));
+      expect(result.printedDate, equals('10/10/2026'));
+      expect(result.printedTime, equals('20:51:01'));
+      expect(result.nozzleCumVolumeMl[1], equals(86106490));
+      expect(result.nozzleCumVolumeMl[2], equals(125635400));
+    });
+
+    test('7. Recovers Nozzle 1 section when Nozzle No1 header is blurred and only Nozzle No2 header is detected', () {
+      const missingN1HeaderReceipt = '''
+IndianOil
+FP. ID : 3
+Pump SNo : 202501001346
+Date : 11/10/2026
+Time : 20:51:38
+ShDaySale: 35609.030
+CumVolume:
+91761.070
+CumSale : 10700216.920
+
+Nozzle No2
+ShDaySale: 90629.530
+455291.350
+CumVolume:
+CumSale :
+127496.520
+13895156.920
+''';
+
+      final result = OcrParserService.parseIndianOilReceipt(
+        missingN1HeaderReceipt,
+        expectedBaselineLitres: {1: 86106.490, 2: 125635.400},
+      );
+      expect(result.success, isTrue);
+      expect(result.nozzleCumVolumeMl[1], equals(91761070));
+      expect(result.nozzleCumVolumeMl[2], equals(127496520));
+      expect(result.nozzleMatchedSnippet[2]!.contains('↑'), isFalse);
+    });
+
+    test('8. Rejects lakh-scale upward number (455291.350) above CumVolume and only accepts reading below CumVolume within 25,000L delta', () {
+      const lakhJumpReceipt = '''
+IndianOil
+FP. ID : 3
+Pump SNo : 202501001346
+Date : 11/10/2026
+Time : 20:51:38
+Nozzle No1
+CumVolume:
+91761.070
+Nozzle No2
+455291.350
+CumVolume:
+''';
+
+      // Here Nozzle 2 has NO reading below CumVolume, only 455291.350 above it (a +3.29 lakh jump from 125635.400).
+      // Parser must reject 455291.350 so ScanReceiptScreen alerts user to "Scan Totaliser Again"!
+      final result = OcrParserService.parseIndianOilReceipt(
+        lakhJumpReceipt,
+        expectedBaselineLitres: {1: 86106.490, 2: 125635.400},
+      );
+      expect(result.success, isTrue);
+      expect(result.nozzleCumVolumeMl[1], equals(91761070));
+      expect(result.nozzleCumVolumeMl.containsKey(2), isFalse);
+    });
   });
 }

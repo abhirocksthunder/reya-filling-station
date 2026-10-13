@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
@@ -5,6 +6,7 @@ import 'firebase_options.dart';
 import 'core/constants/colors.dart';
 import 'models/user_profile.dart';
 import 'services/station_state_provider.dart';
+import 'services/ota_status_service.dart';
 import 'ui/auth/login_screen.dart';
 import 'ui/staff/staff_shell.dart';
 import 'ui/owner/owner_shell.dart';
@@ -22,6 +24,7 @@ void main() async {
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => StationStateProvider()),
+        ChangeNotifierProvider(create: (_) => OtaStatusService()),
       ],
       child: const ReyaFillingStationApp(),
     ),
@@ -34,7 +37,7 @@ class ReyaFillingStationApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Reya Filling Station',
+      title: 'RFS',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
@@ -53,8 +56,36 @@ class ReyaFillingStationApp extends StatelessWidget {
   }
 }
 
-class MainPortalHost extends StatelessWidget {
+class MainPortalHost extends StatefulWidget {
   const MainPortalHost({super.key});
+
+  @override
+  State<MainPortalHost> createState() => _MainPortalHostState();
+}
+
+class _MainPortalHostState extends State<MainPortalHost> {
+  Timer? _minuteLocationTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.read<OtaStatusService?>()?.refresh();
+    });
+    _minuteLocationTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (!mounted) return;
+      final state = context.read<StationStateProvider>();
+      if (state.isAuthenticated) {
+        state.refreshCurrentUserLocation(silent: true);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _minuteLocationTimer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -69,9 +100,8 @@ class MainPortalHost extends StatelessWidget {
       );
     }
 
-    // Role-based portal routing: Owner sees OwnerShell, Staff sees StaffShell
-    final isOwnerRole = state.currentUser.role == UserRole.owner;
-    if (isOwnerRole) {
+    // Role-based portal routing: Owner & Admin (or custom roles with Owner privileges) access OwnerShell
+    if (state.currentUser.hasOwnerPrivileges) {
       return const OwnerShell();
     } else {
       return const StaffShell();

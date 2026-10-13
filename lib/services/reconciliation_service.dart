@@ -1,3 +1,35 @@
+class NozzleRateSegment {
+  final int fromReadingMl;
+  final int toReadingMl;
+  final int grossVolumeMl;
+  final int testVolumeMl;
+  final int billableVolumeMl;
+  final int ratePaisePerLitre;
+  final int amountPaise;
+  final DateTime? startTime;
+  final DateTime? endTime;
+
+  const NozzleRateSegment({
+    required this.fromReadingMl,
+    required this.toReadingMl,
+    required this.grossVolumeMl,
+    required this.testVolumeMl,
+    required this.billableVolumeMl,
+    required this.ratePaisePerLitre,
+    required this.amountPaise,
+    this.startTime,
+    this.endTime,
+  });
+
+  double get fromReadingLitres => fromReadingMl / 1000.0;
+  double get toReadingLitres => toReadingMl / 1000.0;
+  double get grossLitres => grossVolumeMl / 1000.0;
+  double get testLitres => testVolumeMl / 1000.0;
+  double get billableLitres => billableVolumeMl / 1000.0;
+  double get rateRupees => ratePaisePerLitre / 100.0;
+  double get amountRupees => amountPaise / 100.0;
+}
+
 class NozzleCalculationResult {
   final int nozzleNumber;
   final String fuelType;
@@ -8,6 +40,10 @@ class NozzleCalculationResult {
   final int billableVolumeMl;
   final int ratePaisePerLitre;
   final int fuelSalesPaise; // Rounded half-up to nearest paise
+  final List<NozzleRateSegment> segments;
+
+  final String pumpId;
+  final String pumpName;
 
   const NozzleCalculationResult({
     required this.nozzleNumber,
@@ -19,7 +55,20 @@ class NozzleCalculationResult {
     required this.billableVolumeMl,
     required this.ratePaisePerLitre,
     required this.fuelSalesPaise,
+    this.segments = const [],
+    this.pumpId = 'pump_1',
+    this.pumpName = 'Pump 1',
   });
+
+  bool get hasPriceChange => segments.length > 1;
+
+  double get openingLitres => openingReadingMl / 1000.0;
+  double get closingLitres => closingReadingMl / 1000.0;
+  double get grossLitres => grossVolumeMl / 1000.0;
+  double get testLitres => testVolumeMl / 1000.0;
+  double get billableLitres => billableVolumeMl / 1000.0;
+  double get rateRupees => ratePaisePerLitre / 100.0;
+  double get fuelSalesRupees => fuelSalesPaise / 100.0;
 }
 
 class ShiftReconciliationReport {
@@ -92,27 +141,48 @@ class ReconciliationService {
     required int closingReadingMl,
     required int testVolumeMl,
     required int ratePaisePerLitre,
+    bool clampTestVolume = false,
+    String pumpId = 'pump_1',
+    String pumpName = 'Pump 1',
   }) {
-    // Monotonic continuity check: closing reading must be >= opening reading
-    if (closingReadingMl < openingReadingMl) {
+    if (!clampTestVolume && closingReadingMl < openingReadingMl) {
       throw ArgumentError(
         'Closing reading ($closingReadingMl mL) is less than opening reading ($openingReadingMl mL). Counter rollover requires explicit epoch authorization.',
       );
     }
 
-    int grossVolumeMl = closingReadingMl - openingReadingMl;
+    int grossVolumeMl = closingReadingMl >= openingReadingMl
+        ? (closingReadingMl - openingReadingMl)
+        : 0;
     
-    // Test volume deduction cannot exceed gross dispensed volume
-    if (testVolumeMl > grossVolumeMl) {
-      throw ArgumentError(
-        'Approved test volume ($testVolumeMl mL) exceeds gross volume ($grossVolumeMl mL).',
-      );
+    int effectiveTestVolume = testVolumeMl;
+    if (clampTestVolume) {
+      if (effectiveTestVolume > grossVolumeMl) {
+        effectiveTestVolume = grossVolumeMl;
+      }
+    } else {
+      // Test volume deduction cannot exceed gross dispensed volume
+      if (testVolumeMl > grossVolumeMl) {
+        throw ArgumentError(
+          'Approved test volume ($testVolumeMl mL) exceeds gross volume ($grossVolumeMl mL).',
+        );
+      }
     }
 
-    int billableVolumeMl = grossVolumeMl - testVolumeMl;
+    int billableVolumeMl = grossVolumeMl - effectiveTestVolume;
     int fuelSalesPaise = calculateFuelSalesPaise(
       billableVolumeMl: billableVolumeMl,
       ratePaisePerLitre: ratePaisePerLitre,
+    );
+
+    final singleSegment = NozzleRateSegment(
+      fromReadingMl: openingReadingMl,
+      toReadingMl: closingReadingMl,
+      grossVolumeMl: grossVolumeMl,
+      testVolumeMl: effectiveTestVolume,
+      billableVolumeMl: billableVolumeMl,
+      ratePaisePerLitre: ratePaisePerLitre,
+      amountPaise: fuelSalesPaise,
     );
 
     return NozzleCalculationResult(
@@ -121,10 +191,95 @@ class ReconciliationService {
       openingReadingMl: openingReadingMl,
       closingReadingMl: closingReadingMl,
       grossVolumeMl: grossVolumeMl,
-      testVolumeMl: testVolumeMl,
+      testVolumeMl: effectiveTestVolume,
       billableVolumeMl: billableVolumeMl,
       ratePaisePerLitre: ratePaisePerLitre,
       fuelSalesPaise: fuelSalesPaise,
+      segments: [singleSegment],
+      pumpId: pumpId,
+      pumpName: pumpName,
+    );
+  }
+
+  /// Calculates multi-rate partitioned nozzle reconciliation.
+  /// When fuel prices change mid-day or across scans, each segment calculates volume
+  /// and sales at its effective rate, with morning test volume (5 L) applied to the initial segment.
+  static NozzleCalculationResult calculateMultiSegmentNozzle({
+    required int nozzleNumber,
+    required String fuelType,
+    required int openingReadingMl,
+    required int closingReadingMl,
+    required int totalTestVolumeMl,
+    required List<({int fromMl, int toMl, int ratePaisePerLitre, DateTime? startTime, DateTime? endTime})> rawSegments,
+    String pumpId = 'pump_1',
+    String pumpName = 'Pump 1',
+  }) {
+    if (rawSegments.isEmpty) {
+      return calculateNozzle(
+        nozzleNumber: nozzleNumber,
+        fuelType: fuelType,
+        openingReadingMl: openingReadingMl,
+        closingReadingMl: closingReadingMl,
+        testVolumeMl: totalTestVolumeMl,
+        ratePaisePerLitre: 0,
+        clampTestVolume: true,
+        pumpId: pumpId,
+        pumpName: pumpName,
+      );
+    }
+
+    int remainingTestMl = totalTestVolumeMl;
+    int totalGrossMl = 0;
+    int totalFuelSalesPaise = 0;
+    final List<NozzleRateSegment> computedSegments = [];
+
+    for (var seg in rawSegments) {
+      int segGrossMl = seg.toMl >= seg.fromMl ? (seg.toMl - seg.fromMl) : 0;
+      totalGrossMl += segGrossMl;
+
+      int segTestMl = 0;
+      if (remainingTestMl > 0) {
+        segTestMl = remainingTestMl >= segGrossMl ? segGrossMl : remainingTestMl;
+        remainingTestMl -= segTestMl;
+      }
+
+      int segBillableMl = segGrossMl - segTestMl;
+      int segAmountPaise = calculateFuelSalesPaise(
+        billableVolumeMl: segBillableMl,
+        ratePaisePerLitre: seg.ratePaisePerLitre,
+      );
+      totalFuelSalesPaise += segAmountPaise;
+
+      computedSegments.add(NozzleRateSegment(
+        fromReadingMl: seg.fromMl,
+        toReadingMl: seg.toMl,
+        grossVolumeMl: segGrossMl,
+        testVolumeMl: segTestMl,
+        billableVolumeMl: segBillableMl,
+        ratePaisePerLitre: seg.ratePaisePerLitre,
+        amountPaise: segAmountPaise,
+        startTime: seg.startTime,
+        endTime: seg.endTime,
+      ));
+    }
+
+    int effectiveTotalTestMl = totalTestVolumeMl - remainingTestMl;
+    int totalBillableMl = totalGrossMl - effectiveTotalTestMl;
+    int effectiveRate = computedSegments.last.ratePaisePerLitre;
+
+    return NozzleCalculationResult(
+      nozzleNumber: nozzleNumber,
+      fuelType: fuelType,
+      openingReadingMl: openingReadingMl,
+      closingReadingMl: closingReadingMl,
+      grossVolumeMl: totalGrossMl,
+      testVolumeMl: effectiveTotalTestMl,
+      billableVolumeMl: totalBillableMl,
+      ratePaisePerLitre: effectiveRate,
+      fuelSalesPaise: totalFuelSalesPaise,
+      segments: computedSegments,
+      pumpId: pumpId,
+      pumpName: pumpName,
     );
   }
 

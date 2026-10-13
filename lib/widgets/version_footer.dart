@@ -40,19 +40,20 @@ class _VersionFooterState extends State<VersionFooter> {
 
     if (widget.compact) {
       return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
         decoration: BoxDecoration(
           color: Colors.black.withOpacity(0.05),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(10),
           border: Border.all(color: Colors.black.withOpacity(0.08)),
         ),
         child: Text(
           _displayVersion,
+          softWrap: false,
           style: TextStyle(
             color: textColor,
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 0.3,
+            fontSize: 10.5,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.1,
           ),
         ),
       );

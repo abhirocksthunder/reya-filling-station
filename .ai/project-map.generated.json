@@ -1,0 +1,419 @@
+{
+  "agents": {},
+  "architecture_docs": [
+    {
+      "path": "AGENTS.md",
+      "source_ref": "AGENTS.md:1"
+    },
+    {
+      "path": "docs/archive/roadmaps/2026-10-12-current-data-admin-ui-engineering.md",
+      "source_ref": "docs/archive/roadmaps/2026-10-12-current-data-admin-ui-engineering.md:1"
+    },
+    {
+      "path": "docs/archive/roadmaps/2026-10-12-footer-only-navigation-v1.0.32-33.md",
+      "source_ref": "docs/archive/roadmaps/2026-10-12-footer-only-navigation-v1.0.32-33.md:1"
+    },
+    {
+      "path": "docs/archive/roadmaps/2026-10-12-forced-migration-publication-v1.0.33-34.md",
+      "source_ref": "docs/archive/roadmaps/2026-10-12-forced-migration-publication-v1.0.33-34.md:1"
+    },
+    {
+      "path": "docs/archive/roadmaps/2026-10-12-owner-overview-sections-v1.0.31-32.md",
+      "source_ref": "docs/archive/roadmaps/2026-10-12-owner-overview-sections-v1.0.31-32.md:1"
+    },
+    {
+      "path": "docs/archive/roadmaps/2026-10-12-purge-retired-download-engineering.md",
+      "source_ref": "docs/archive/roadmaps/2026-10-12-purge-retired-download-engineering.md:1"
+    },
+    {
+      "path": "docs/archive/roadmaps/2026-10-12-release-v1.0.30-31.md",
+      "source_ref": "docs/archive/roadmaps/2026-10-12-release-v1.0.30-31.md:1"
+    },
+    {
+      "path": "docs/archive/roadmaps/2026-10-12-settings-admin-editor-cleanup.md",
+      "source_ref": "docs/archive/roadmaps/2026-10-12-settings-admin-editor-cleanup.md:1"
+    },
+    {
+      "path": "docs/archive/roadmaps/2026-10-12-shorebird-migration-apk-v1.0.33-34.md",
+      "source_ref": "docs/archive/roadmaps/2026-10-12-shorebird-migration-apk-v1.0.33-34.md:1"
+    },
+    {
+      "path": "docs/archive/roadmaps/2026-10-12-signed-ota-integration-checkpoint.md",
+      "source_ref": "docs/archive/roadmaps/2026-10-12-signed-ota-integration-checkpoint.md:1"
+    },
+    {
+      "path": "docs/archive/roadmaps/2026-10-12-stable-patch-1-no-device-deployment.md",
+      "source_ref": "docs/archive/roadmaps/2026-10-12-stable-patch-1-no-device-deployment.md:1"
+    },
+    {
+      "path": "docs/decisions/adr-001-initial-architecture.md",
+      "source_ref": "docs/decisions/adr-001-initial-architecture.md:1"
+    },
+    {
+      "path": "docs/decisions/adr-002-signed-silent-updates.md",
+      "source_ref": "docs/decisions/adr-002-signed-silent-updates.md:1"
+    },
+    {
+      "path": "docs/decisions/adr-003-current-data-insights-and-admin-navigation.md",
+      "source_ref": "docs/decisions/adr-003-current-data-insights-and-admin-navigation.md:1"
+    },
+    {
+      "path": "docs/specs/current-data-insights-and-admin-navigation.md",
+      "source_ref": "docs/specs/current-data-insights-and-admin-navigation.md:1"
+    },
+    {
+      "path": "docs/specs/owner-authorized-deployment.md",
+      "source_ref": "docs/specs/owner-authorized-deployment.md:1"
+    },
+    {
+      "path": "docs/specs/silent-updates.md",
+      "source_ref": "docs/specs/silent-updates.md:1"
+    },
+    {
+      "path": "docs/specs/technical-architecture.md",
+      "source_ref": "docs/specs/technical-architecture.md:1"
+    },
+    {
+      "path": "docs/technical-architecture.md",
+      "source_ref": "docs/technical-architecture.md:1"
+    }
+  ],
+  "domains": {
+    "AGENTS": {
+      "file_count": 1,
+      "path": "AGENTS",
+      "source_refs": [
+        "AGENTS.md:1"
+      ]
+    },
+    "README": {
+      "file_count": 1,
+      "path": "README",
+      "source_refs": [
+        "README.md:1"
+      ]
+    },
+    "analysis_options": {
+      "file_count": 1,
+      "path": "analysis_options",
+      "source_refs": [
+        "analysis_options.yaml:1"
+      ]
+    },
+    "config": {
+      "file_count": 1,
+      "path": "config",
+      "source_refs": [
+        "config/roadmap_phases.json:1"
+      ]
+    },
+    "docs": {
+      "file_count": 18,
+      "path": "docs",
+      "source_refs": [
+        "docs/archive/roadmaps/2026-10-12-current-data-admin-ui-engineering.md:1",
+        "docs/archive/roadmaps/2026-10-12-footer-only-navigation-v1.0.32-33.md:1",
+        "docs/archive/roadmaps/2026-10-12-forced-migration-publication-v1.0.33-34.md:1"
+      ]
+    },
+    "firebase": {
+      "file_count": 1,
+      "path": "firebase",
+      "source_refs": [
+        "firebase.json:1"
+      ]
+    },
+    "firestore.indexes": {
+      "file_count": 1,
+      "path": "firestore.indexes",
+      "source_refs": [
+        "firestore.indexes.json:1"
+      ]
+    },
+    "ios": {
+      "file_count": 3,
+      "path": "ios",
+      "source_refs": [
+        "ios/Runner/Assets.xcassets/AppIcon.appiconset/Contents.json:1",
+        "ios/Runner/Assets.xcassets/LaunchImage.imageset/Contents.json:1",
+        "ios/Runner/Assets.xcassets/LaunchImage.imageset/README.md:1"
+      ]
+    },
+    "macos": {
+      "file_count": 1,
+      "path": "macos",
+      "source_refs": [
+        "macos/Runner/Assets.xcassets/AppIcon.appiconset/Contents.json:1"
+      ]
+    },
+    "progress": {
+      "file_count": 1,
+      "path": "progress",
+      "source_refs": [
+        "progress.md:1"
+      ]
+    },
+    "pubspec": {
+      "file_count": 1,
+      "path": "pubspec",
+      "source_refs": [
+        "pubspec.yaml:1"
+      ]
+    },
+    "scripts": {
+      "file_count": 2,
+      "path": "scripts",
+      "source_refs": [
+        "scripts/build_web_release.py:1",
+        "scripts/seed_firestore.js:1"
+      ]
+    },
+    "shorebird": {
+      "file_count": 1,
+      "path": "shorebird",
+      "source_refs": [
+        "shorebird.yaml:1"
+      ]
+    },
+    "web": {
+      "file_count": 2,
+      "path": "web",
+      "source_refs": [
+        "web/index.html:1",
+        "web/manifest.json:1"
+      ]
+    }
+  },
+  "events": {},
+  "generated_at": "2026-10-12T11:48:02+00:00",
+  "integrations": {
+    "RAG": {
+      "name": "RAG",
+      "source_refs": [
+        "README.md:93",
+        "README.md:103",
+        "README.md:104",
+        "README.md:127",
+        "README.md:196",
+        "README.md:293",
+        "README.md:294",
+        "analysis_options.yaml:9"
+      ]
+    }
+  },
+  "project": {
+    "description": "Reya Filling Station application linked to AIPCC.",
+    "git": {
+      "available": true,
+      "branch": "master",
+      "dirty_file_count": 116
+    },
+    "id": "reya-filling-station",
+    "kind": "child",
+    "label": "Reya Filling Station",
+    "parent_id": "aipcc",
+    "root_dir": "D:\\reya-filling-station",
+    "tags": [
+      "active"
+    ]
+  },
+  "projects": {
+    "ai-safari": {
+      "description": "Multiplayer distributed AI & Systems Engineering game engine with Authoritative Host Deck, Stage 1 Solo Quests, Stage 2 Team Battles, and Cloudflare Tunnel remote controls.",
+      "kind": "child",
+      "label": "AI Safari Game Engine",
+      "parent_id": "aipcc",
+      "root_dir": ".",
+      "root_exists": true,
+      "tags": [
+        "game",
+        "safari",
+        "live",
+        "active"
+      ]
+    },
+    "aipcc": {
+      "description": "This project -- the local command center, dashboard, chat, and MCP hub that the other linked projects report into.",
+      "kind": "parent",
+      "label": "AI Personal Command Center",
+      "parent_id": null,
+      "root_dir": ".",
+      "root_exists": true,
+      "tags": [
+        "hub"
+      ]
+    },
+    "aipcc-nano-forge": {
+      "description": "Aipcc Nano Forge application linked to AIPCC.",
+      "kind": "child",
+      "label": "Aipcc Nano Forge",
+      "parent_id": "aipcc",
+      "root_dir": "D:/aipcc-nano-forge",
+      "root_exists": true,
+      "tags": [
+        "active"
+      ]
+    },
+    "bhasha-vaani": {
+      "description": "Family language-learning platform: FastAPI backend, Vite/React PWA (primary client per ADR-004), and a legacy Flutter app still running side-by-side.",
+      "kind": "child",
+      "label": "BhashaVaani",
+      "parent_id": "aipcc",
+      "root_dir": "D:/bhasha-vaani",
+      "root_exists": true,
+      "tags": []
+    },
+    "career-pilot": {
+      "description": "Standalone, privacy-first, human-approved AI Career Opportunity Agent with Rust/Axum backend, SQLx, Next.js frontend, and Manifest V3 Chrome Extension.",
+      "kind": "child",
+      "label": "Career-Pilot",
+      "parent_id": "aipcc",
+      "root_dir": "D:/career-pilot",
+      "root_exists": true,
+      "tags": [
+        "career",
+        "agent",
+        "standalone"
+      ]
+    },
+    "fuelops": {
+      "description": "FuelOps Petrol Bunk Management System application linked to AIPCC.",
+      "kind": "child",
+      "label": "FuelOps Petrol Bunk Management System",
+      "parent_id": "aipcc",
+      "root_dir": "D:/fuelops",
+      "root_exists": true,
+      "tags": [
+        "active"
+      ]
+    },
+    "intervprep-ai": {
+      "description": "Owns the real Gmail/GitHub OAuth connectors; AIPCC proxies its /api/connectors/... endpoints rather than duplicating that OAuth machinery.",
+      "kind": "child",
+      "label": "IntervPrep AI",
+      "parent_id": "aipcc",
+      "root_dir": "D:/intervprep-ai",
+      "root_exists": true,
+      "tags": [
+        "connectors"
+      ]
+    },
+    "mta": {
+      "description": "",
+      "kind": "child",
+      "label": "MTA",
+      "parent_id": "aipcc",
+      "root_dir": "E:/mta",
+      "root_exists": true,
+      "tags": []
+    },
+    "portfolio-site": {
+      "description": "Crisp public portfolio and 'What I'm building' live outlines: guarded static build, numbers-only pulse export, and single-use eligibility gate.",
+      "kind": "child",
+      "label": "Portfolio Site",
+      "parent_id": "aipcc",
+      "root_dir": "D:/portfolio-site - Chatgpt",
+      "root_exists": true,
+      "tags": [
+        "active"
+      ]
+    },
+    "project-hub": {
+      "description": "Documentation portal and sync agent that pulls docs from the other linked projects.",
+      "kind": "child",
+      "label": "Project Hub",
+      "parent_id": "aipcc",
+      "root_dir": "D:/project-hub",
+      "root_exists": true,
+      "tags": [
+        "docs-sync"
+      ]
+    },
+    "restaurant-pos": {
+      "description": "Flutter-based restaurant point-of-sale app.",
+      "kind": "child",
+      "label": "Restaurant POS (Flutter)",
+      "parent_id": "aipcc",
+      "root_dir": "E:/projects/flutter/restaurant_pos",
+      "root_exists": true,
+      "tags": []
+    },
+    "reya-filling-station": {
+      "description": "Reya Filling Station application linked to AIPCC.",
+      "kind": "child",
+      "label": "Reya Filling Station",
+      "parent_id": "aipcc",
+      "root_dir": "D:/reya-filling-station",
+      "root_exists": true,
+      "tags": [
+        "active"
+      ]
+    },
+    "room-sense": {
+      "description": "Room Sense application linked to AIPCC.",
+      "kind": "child",
+      "label": "Room Sense",
+      "parent_id": "aipcc",
+      "root_dir": "D:/room-sense",
+      "root_exists": true,
+      "tags": [
+        "active"
+      ]
+    },
+    "sarabhi-cinema": {
+      "description": "Sarabhi Cinema application linked to AIPCC.",
+      "kind": "child",
+      "label": "Sarabhi Cinema",
+      "parent_id": "aipcc",
+      "root_dir": "D:/AI operating system/projects/sarabhi-cinema",
+      "root_exists": true,
+      "tags": [
+        "active"
+      ]
+    },
+    "tishi": {
+      "description": "Native mobile (Flutter for Android/iOS) and Samsung Wear OS (Kotlin + Compose) companion for capturing ideas, interacting with Sarabhi, receiving notifications, checking AIPCC status, and approving actions. AIPCC is the intelligence layer and system of record.",
+      "kind": "child",
+      "label": "Tishi",
+      "parent_id": "aipcc",
+      "root_dir": "D:/Tishi",
+      "root_exists": true,
+      "tags": [
+        "mobile",
+        "companion",
+        "wear-os"
+      ]
+    },
+    "vistrike": {
+      "description": "Active training/event pipeline project. Distinct from vistrike-training-videos (AI/ML workspace); this repo owns the core Vistrike application pipeline.",
+      "kind": "child",
+      "label": "Vistrike",
+      "parent_id": "aipcc",
+      "root_dir": "E:/projects/vistrike",
+      "root_exists": true,
+      "tags": [
+        "active",
+        "vistrike"
+      ]
+    },
+    "vistrike-training-videos": {
+      "description": "Active Vistrike AI/training workspace: tennis video ML pipeline, FastAPI remote review app, agents, datasets, experiments, and Project Hub documentation manifest.",
+      "kind": "child",
+      "label": "Vistrike AI and Training",
+      "parent_id": "aipcc",
+      "root_dir": "E:/training-videos-for-ai",
+      "root_exists": true,
+      "tags": [
+        "active",
+        "vistrike",
+        "ai-ml"
+      ]
+    }
+  },
+  "repository_fingerprint": "bff57ec23f2e9adc7dfc84c53728a8e829431d90495e0729c0abd637ad9ba95e",
+  "runtime_services": {},
+  "schema_version": 1,
+  "stores": {},
+  "tests": {},
+  "tools": {}
+}

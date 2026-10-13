@@ -20,7 +20,7 @@ class _CreditKhataScreenState extends State<CreditKhataScreen> {
   int _selectedCustomerIdx = 0;
   int _currentPage = 1;
   static const int _pageSize = 10;
-  final TextEditingController _paymentAmountController = TextEditingController(text: '5,000');
+  final TextEditingController _paymentAmountController = TextEditingController(text: '5,000.00');
   String _paymentMode = 'Cash';
 
   @override
@@ -48,37 +48,52 @@ class _CreditKhataScreenState extends State<CreditKhataScreen> {
         ? displayedCustomers[_selectedCustomerIdx.clamp(0, displayedCustomers.length - 1)]
         : (customers.isNotEmpty ? customers.first : null);
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header & Total Outstanding
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return LayoutBuilder(
+      builder: (context, screenConstraints) {
+        final isMobile = screenConstraints.maxWidth < 600;
+
+        return SingleChildScrollView(
+          padding: EdgeInsets.all(isMobile ? 14 : 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                AppStrings.get('customersYetToPay', lang),
-                style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: StationColors.textDark),
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
+              // Responsive Header & Total Outstanding
+              Wrap(
+                spacing: 12,
+                runSpacing: 10,
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   Text(
-                    CurrencyFormatter.formatPaise(totalOutstanding),
-                    style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w900, color: StationColors.accentOrange),
+                    AppStrings.get('customersYetToPay', lang),
+                    style: TextStyle(
+                      fontSize: isMobile ? 22 : 26,
+                      fontWeight: FontWeight.w800,
+                      color: StationColors.textDark,
+                    ),
                   ),
-                  const Text('Outstanding balance', style: TextStyle(fontSize: 12, color: StationColors.textLight)),
+                  Column(
+                    crossAxisAlignment: isMobile ? CrossAxisAlignment.start : CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        CurrencyFormatter.formatPaise(totalOutstanding),
+                        style: TextStyle(
+                          fontSize: isMobile ? 24 : 30,
+                          fontWeight: FontWeight.w900,
+                          color: StationColors.accentOrange,
+                        ),
+                      ),
+                      const Text('Outstanding balance', style: TextStyle(fontSize: 12, color: StationColors.textLight)),
+                    ],
+                  ),
                 ],
               ),
-            ],
-          ),
-          const SizedBox(height: 24),
+              const SizedBox(height: 20),
 
-          // Two-column Layout: Customers List & Detail/Payment
-          LayoutBuilder(
-            builder: (context, constraints) {
-              bool isWide = constraints.maxWidth > 750;
+              // Two-column Layout: Customers List & Detail/Payment
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  bool isWide = constraints.maxWidth > 750;
 
               Widget customersList = Column(
                 children: [
@@ -185,14 +200,18 @@ class _CreditKhataScreenState extends State<CreditKhataScreen> {
                         children: [
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(customer.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20, color: StationColors.textDark)),
-                                  Text(customer.subtitle, style: const TextStyle(fontSize: 13, color: StationColors.textMedium)),
-                                ],
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(customer.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20, color: StationColors.textDark)),
+                                    Text(customer.subtitle, style: const TextStyle(fontSize: 13, color: StationColors.textMedium)),
+                                  ],
+                                ),
                               ),
+                              const SizedBox(width: 8),
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                 decoration: BoxDecoration(
@@ -223,10 +242,13 @@ class _CreditKhataScreenState extends State<CreditKhataScreen> {
                                 child: Row(
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Text(
-                                      '${p.date.day}/${p.date.month} • Paid via ${p.mode}${p.note != null ? ' (${p.note})' : ''}',
-                                      style: const TextStyle(fontSize: 13, color: StationColors.textMedium),
+                                    Expanded(
+                                      child: Text(
+                                        '${p.date.day}/${p.date.month} • Paid via ${p.mode}${p.note != null ? ' (${p.note})' : ''}',
+                                        style: const TextStyle(fontSize: 13, color: StationColors.textMedium),
+                                      ),
                                     ),
+                                    const SizedBox(width: 8),
                                     Text(
                                       p.formattedAmount,
                                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: StationColors.successGreen),
@@ -240,49 +262,87 @@ class _CreditKhataScreenState extends State<CreditKhataScreen> {
                           // Record Khata Payment Section
                           const Text('Record Khata payment', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                           const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              Expanded(
-                                flex: 3,
-                                child: TextField(
-                                  controller: _paymentAmountController,
-                                  keyboardType: TextInputType.number,
-                                  maxLength: 10,
-                                  inputFormatters: [
-                                    FilteringTextInputFormatter.digitsOnly,
-                                    LengthLimitingTextInputFormatter(10),
+                          isMobile
+                              ? Column(
+                                  children: [
+                                    TextField(
+                                      controller: _paymentAmountController,
+                                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                      maxLength: 15,
+                                      inputFormatters: [
+                                        IndianCurrencyInputFormatter(),
+                                        LengthLimitingTextInputFormatter(15),
+                                      ],
+                                      decoration: InputDecoration(
+                                        labelText: 'Payment amount',
+                                        prefixText: '₹ ',
+                                        counterText: '',
+                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 10),
+                                    DropdownButtonFormField<String>(
+                                      value: _paymentMode,
+                                      decoration: InputDecoration(
+                                        labelText: 'Mode',
+                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                      ),
+                                      items: const [
+                                        DropdownMenuItem(value: 'Cash', child: Text('Cash')),
+                                        DropdownMenuItem(value: 'PhonePe', child: Text('PhonePe')),
+                                        DropdownMenuItem(value: 'Bank', child: Text('Bank Transfer')),
+                                      ],
+                                      onChanged: (val) {
+                                        if (val != null) setState(() => _paymentMode = val);
+                                      },
+                                    ),
                                   ],
-                                  decoration: InputDecoration(
-                                    labelText: 'Payment amount',
-                                    prefixText: '₹ ',
-                                    counterText: '',
-                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                flex: 2,
-                                child: DropdownButtonFormField<String>(
-                                  value: _paymentMode,
-                                  decoration: InputDecoration(
-                                    labelText: 'Mode',
-                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                                  ),
-                                  items: const [
-                                    DropdownMenuItem(value: 'Cash', child: Text('Cash')),
-                                    DropdownMenuItem(value: 'PhonePe', child: Text('PhonePe')),
-                                    DropdownMenuItem(value: 'Bank', child: Text('Bank Transfer')),
+                                )
+                              : Row(
+                                  children: [
+                                    Expanded(
+                                      flex: 3,
+                                      child: TextField(
+                                        controller: _paymentAmountController,
+                                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                        maxLength: 15,
+                                        inputFormatters: [
+                                          IndianCurrencyInputFormatter(),
+                                          LengthLimitingTextInputFormatter(15),
+                                        ],
+                                        decoration: InputDecoration(
+                                          labelText: 'Payment amount',
+                                          prefixText: '₹ ',
+                                          counterText: '',
+                                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      flex: 2,
+                                      child: DropdownButtonFormField<String>(
+                                        value: _paymentMode,
+                                        decoration: InputDecoration(
+                                          labelText: 'Mode',
+                                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                        ),
+                                        items: const [
+                                          DropdownMenuItem(value: 'Cash', child: Text('Cash')),
+                                          DropdownMenuItem(value: 'PhonePe', child: Text('PhonePe')),
+                                          DropdownMenuItem(value: 'Bank', child: Text('Bank Transfer')),
+                                        ],
+                                        onChanged: (val) {
+                                          if (val != null) setState(() => _paymentMode = val);
+                                        },
+                                      ),
+                                    ),
                                   ],
-                                  onChanged: (val) {
-                                    if (val != null) setState(() => _paymentMode = val);
-                                  },
                                 ),
-                              ),
-                            ],
-                          ),
                           const SizedBox(height: 16),
                           SizedBox(
                             width: double.infinity,
@@ -334,6 +394,8 @@ class _CreditKhataScreenState extends State<CreditKhataScreen> {
           ),
         ],
       ),
+    );
+      },
     );
   }
 }

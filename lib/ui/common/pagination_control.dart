@@ -27,10 +27,10 @@ class PaginationControl extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        bool isNarrow = constraints.maxWidth < 400;
+        bool isNarrow = constraints.maxWidth < 650;
 
         if (isNarrow) {
-          // Compact / Column Layout for sidebars (< 360px) and narrow screens
+          // Compact / Column Layout for phone screens and narrow content panels
           return Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -55,7 +55,7 @@ class PaginationControl extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     SizedBox(
-                      height: 36,
+                      height: 44,
                       child: OutlinedButton(
                         style: OutlinedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -73,7 +73,7 @@ class PaginationControl extends StatelessWidget {
                       ),
                     ),
                     SizedBox(
-                      height: 36,
+                      height: 44,
                       child: OutlinedButton(
                         style: OutlinedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(horizontal: 10),

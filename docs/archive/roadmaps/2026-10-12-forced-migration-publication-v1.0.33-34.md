@@ -1,0 +1,3 @@
+# Mandatory migration publication
+
+Published website and signed Shorebird migration APK v1.0.33+34 to Firebase Hosting. Verified the public APK SHA256 86925739cb09250b55076cf66f36fd00fd8d40b3ac9e7aecf0b23237c99399fe matches the identity-verified base. At the user's request because station APK use has not begun, published latestVersion=1.0.33, latestBuildNumber=34 and forceUpdate=true, preserving unrelated settings. Migration publisher now supports explicit --force while remaining optional by default. Previous v1.0.32+33 installations receive the mandatory update policy; Android installation still requires user confirmation. Physical-device OTA download/activation QA remains pending; no OTA patch was promoted.

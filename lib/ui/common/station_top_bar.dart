@@ -6,18 +6,24 @@ import '../../core/formatting/date_formatter.dart';
 import '../../l10n/app_strings.dart';
 import '../../models/user_profile.dart';
 import '../../services/station_state_provider.dart';
+import '../../services/app_version_service.dart';
 import '../../widgets/version_footer.dart';
+import '../../widgets/force_update_dialog.dart';
 
 class StationTopBar extends StatelessWidget implements PreferredSizeWidget {
   final VoidCallback? onNotificationTap;
+  final Function(int)? onNavigateTab;
   final bool isOwnerView;
   final VoidCallback? onLogout;
+  final Widget? leading;
 
   const StationTopBar({
     super.key,
     this.onNotificationTap,
+    this.onNavigateTab,
     this.isOwnerView = false,
     this.onLogout,
+    this.leading,
   });
 
   @override
@@ -28,39 +34,41 @@ class StationTopBar extends StatelessWidget implements PreferredSizeWidget {
     final state = context.watch<StationStateProvider>();
     final lang = state.currentLanguage;
     final user = state.currentUser;
+    final isMobile = MediaQuery.of(context).size.width < 600;
 
     return AppBar(
+      leading: leading,
       backgroundColor: Colors.white,
       elevation: 0.5,
       surfaceTintColor: Colors.transparent,
-      titleSpacing: StationDimensions.paddingMedium,
+      titleSpacing: leading != null ? 0 : StationDimensions.paddingMedium,
       title: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(7),
             decoration: BoxDecoration(
               color: StationColors.primaryLight.withOpacity(0.12),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: const Icon(Icons.local_gas_station_rounded, color: StationColors.primary, size: 24),
+            child: const Icon(Icons.local_gas_station_rounded, color: StationColors.primary, size: 22),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Row(
+          const SizedBox(width: 8),
+          Flexible(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Flexible(
-                  child: Text(
-                    AppStrings.get('appName', lang),
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: StationColors.textDark,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: -0.3,
-                    ),
+                Text(
+                  AppStrings.get('appName', lang),
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: StationColors.textDark,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: -0.3,
                   ),
                 ),
-                const SizedBox(width: 8),
                 const VersionFooter(compact: true),
               ],
             ),
@@ -68,28 +76,30 @@ class StationTopBar extends StatelessWidget implements PreferredSizeWidget {
         ],
       ),
       actions: [
-        // Live Dynamic IST Date Badge
-        Container(
-          margin: const EdgeInsets.symmetric(vertical: 14),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF3F4F6),
-            borderRadius: BorderRadius.circular(StationDimensions.pillRadius),
-            border: Border.all(color: StationColors.divider),
+        // Live Dynamic IST Date Badge (hidden on compact mobile to prevent crowding)
+        if (!isMobile) ...[
+          Container(
+            margin: const EdgeInsets.symmetric(vertical: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF3F4F6),
+              borderRadius: BorderRadius.circular(StationDimensions.pillRadius),
+              border: Border.all(color: StationColors.divider),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.today, size: 14, color: StationColors.primary),
+                const SizedBox(width: 5),
+                Text(
+                  DateFormatter.formatDisplayDate(DateTime.now()),
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: StationColors.textDark),
+                ),
+              ],
+            ),
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.today, size: 14, color: StationColors.primary),
-              const SizedBox(width: 5),
-              Text(
-                DateFormatter.formatDisplayDate(DateTime.now()),
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: StationColors.textDark),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(width: 8),
+          const SizedBox(width: 8),
+        ],
 
         // Language Toggle Pill
         Container(
@@ -108,14 +118,14 @@ class StationTopBar extends StatelessWidget implements PreferredSizeWidget {
             ],
           ),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: 4),
 
         // Notifications Bell
         Stack(
           alignment: Alignment.center,
           children: [
             IconButton(
-              icon: const Icon(Icons.notifications_none_rounded, color: StationColors.textDark),
+              icon: const Icon(Icons.notifications_none_rounded, color: StationColors.textDark, size: 22),
               tooltip: 'Notifications',
               onPressed: onNotificationTap ?? () => _showNotificationSheet(context),
             ),
@@ -140,8 +150,8 @@ class StationTopBar extends StatelessWidget implements PreferredSizeWidget {
           tooltip: 'My Account',
           offset: const Offset(0, 50),
           child: Container(
-            margin: const EdgeInsets.only(right: 16, left: 4),
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            margin: EdgeInsets.only(right: isMobile ? 8 : 16, left: 2),
+            padding: EdgeInsets.symmetric(horizontal: isMobile ? 6 : 10, vertical: 6),
             decoration: BoxDecoration(
               color: StationColors.primaryDark,
               borderRadius: BorderRadius.circular(StationDimensions.pillRadius),
@@ -157,16 +167,18 @@ class StationTopBar extends StatelessWidget implements PreferredSizeWidget {
                     style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
                   ),
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  user.name,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
+                if (!isMobile) ...[
+                  const SizedBox(width: 8),
+                  Text(
+                    user.name,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-                const SizedBox(width: 4),
+                ],
+                const SizedBox(width: 2),
                 const Icon(Icons.arrow_drop_down, color: Colors.white70, size: 18),
               ],
             ),
@@ -178,9 +190,28 @@ class StationTopBar extends StatelessWidget implements PreferredSizeWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      user.name,
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: StationColors.textDark),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            '${user.name} (Self)',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: StationColors.textDark),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                          decoration: BoxDecoration(
+                            color: StationColors.primary,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Text(
+                            'Self',
+                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
+                          ),
+                        ),
+                      ],
                     ),
                     Text(
                       '${user.role.displayName}${user.assignedShift != null ? ' • ${user.assignedShift}' : ''}',
@@ -189,7 +220,19 @@ class StationTopBar extends StatelessWidget implements PreferredSizeWidget {
                     if (user.email.isNotEmpty)
                       Text(user.email, style: const TextStyle(fontSize: 11, color: StationColors.textLight)),
                     Text(user.phoneNumber, style: const TextStyle(fontSize: 11, color: StationColors.textLight)),
+                    const SizedBox(height: 6),
+                    const VersionFooter(),
                     const Divider(),
+                  ],
+                ),
+              ),
+              PopupMenuItem<String>(
+                value: 'apk',
+                child: Row(
+                  children: const [
+                    Icon(Icons.system_update_alt, size: 18, color: StationColors.primary),
+                    SizedBox(width: 10),
+                    Text('Download / Share APK', style: TextStyle(color: StationColors.primary, fontWeight: FontWeight.w600)),
                   ],
                 ),
               ),
@@ -206,7 +249,13 @@ class StationTopBar extends StatelessWidget implements PreferredSizeWidget {
             ];
           },
           onSelected: (val) {
-            if (val == 'logout') {
+            if (val == 'apk') {
+              ForceUpdateDialog.show(
+                context,
+                state.settings,
+                previewMode: true,
+              );
+            } else if (val == 'logout') {
               if (onLogout != null) {
                 onLogout!();
               } else {
@@ -276,9 +325,42 @@ class StationTopBar extends StatelessWidget implements PreferredSizeWidget {
                     shrinkWrap: true,
                     itemCount: state.notifications.length,
                     separatorBuilder: (_, __) => const Divider(height: 1),
-                    itemBuilder: (context, i) {
+                    itemBuilder: (sheetContext, i) {
                       final item = state.notifications[i];
+                      final lower = item.title.toLowerCase();
+                      final isApkOrUpdate = lower.contains('apk') || lower.contains('update');
                       return ListTile(
+                        onTap: (onNavigateTab == null && !isApkOrUpdate)
+                            ? null
+                            : () {
+                                Navigator.pop(sheetContext);
+                                if (isApkOrUpdate) {
+                                  ForceUpdateDialog.show(
+                                    context,
+                                    state.settings,
+                                    previewMode: !state.settings.forceUpdate,
+                                  );
+                                  if (onNavigateTab != null && !AppVersionService.isUpdateAvailable(state.settings)) {
+                                    onNavigateTab!(7); // Settings
+                                  }
+                                } else if (onNavigateTab != null) {
+                                  if (lower.contains('user')) {
+                                    onNavigateTab!(5); // People Management
+                                  } else if (lower.contains('shift')) {
+                                    onNavigateTab!(2); // Shift Review
+                                  } else if (lower.contains('receipt')) {
+                                    onNavigateTab!(1); // Receipts Inbox
+                                  } else if (lower.contains('credit')) {
+                                    onNavigateTab!(4); // Credit Khata
+                                  } else if (lower.contains('pump')) {
+                                    onNavigateTab!(6); // Pump Setup
+                                  } else if (lower.contains('settings')) {
+                                    onNavigateTab!(7); // Settings
+                                  } else {
+                                    onNavigateTab!(3); // Money Ledger
+                                  }
+                                }
+                              },
                         leading: CircleAvatar(
                           backgroundColor: item.isWarning
                               ? StationColors.warningBg
@@ -290,7 +372,13 @@ class StationTopBar extends StatelessWidget implements PreferredSizeWidget {
                           ),
                         ),
                         title: Text(item.title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                        subtitle: Text(item.subtitle, style: const TextStyle(fontSize: 12)),
+                        subtitle: Text(
+                          '${item.subtitle} • ${DateFormatter.formatTimeIST(item.timestamp)}',
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                        trailing: (onNavigateTab != null || isApkOrUpdate)
+                            ? const Icon(Icons.chevron_right, size: 18, color: StationColors.textLight)
+                            : null,
                         dense: true,
                       );
                     },

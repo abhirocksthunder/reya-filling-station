@@ -1,0 +1,3 @@
+# Completed owner-authorized deployment
+
+Deployed signed Shorebird Patch 1 to stable for v1.0.33+34 and published matching website revision 20261012153722-f54e05abc5e17720. User explicitly authorized skipping physical-device testing; no device QA is claimed. 125 Flutter tests, 22 release checks, signed staging/native/asset checks, anonymous live-browser startup, live code/revision hashes and public migration APK hash verification passed. Original migration APK SHA256 86925739cb09250b55076cf66f36fd00fd8d40b3ac9e7aecf0b23237c99399fe and existing forceUpdate=true policy preserved. Web builds now guard against publishing a stale or patch-build APK download.

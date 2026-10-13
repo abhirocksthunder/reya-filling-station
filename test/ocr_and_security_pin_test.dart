@@ -271,5 +271,161 @@ CumSale: 25900000.00
 
       expect(status, equals(ReceiptValidationStatus.lowerCounter));
     });
+
+    test('7. Strictly rejects Shift2Sale and wrapped line shift counters, isolating CumVolume below line', () {
+      const shift2Receipt = '''
+IndianOil
+FP. ID : 1
+Pump SNo : 202501001272
+Date : 10/10/2026
+Time : 22:30:15
+
+Nozzle No1
+Shif1Sale: 1850.200
+Shif1Vol : 16.200
+Shift2Sale:
+20951.850
+Shift2Vol: 178.500
+ShDaySale:
+41461.180
+ShDayVol : 352.860
+ShMTHSale:
+392689.850
+CumVolume:
+171054.450
+CumSale : 18989346.490
+
+Nozzle No2
+Shift2Sale: 12080.400
+ShDaySale: 62900.350
+CumVolume:
+275912.820
+CumSale : 27916133.280
+''';
+
+      final res = OcrParserService.parseIndianOilReceipt(shift2Receipt);
+
+      expect(res.success, isTrue);
+      expect(res.nozzleCumVolumeMl[1], equals(171054450));
+      expect(res.nozzleCumVolumeMl[2], equals(275912820));
+
+      // CRITICAL: Must NEVER equal Shift2Sale (20951.850 / 12080.400) or ShDaySale or ShMTHSale
+      expect(res.nozzleCumVolumeMl[1], isNot(equals(20951850)));
+      expect(res.nozzleCumVolumeMl[1], isNot(equals(41461180)));
+      expect(res.nozzleCumVolumeMl[1], isNot(equals(392689850)));
+      expect(res.nozzleCumVolumeMl[2], isNot(equals(12080400)));
+      expect(res.nozzleCumVolumeMl[2], isNot(equals(62900350)));
+    });
+
+    test('8. Handles CurnVolume and CumVo1 optical ambiguities with value on subsequent line', () {
+      const opticalSlip = '''
+IndianOil
+FP. ID : 1
+Pump SNo : 202501001272
+Date : 10/10/2026
+Time : 22:35:00
+
+Nozzle No1
+Shift2Sale: 20951.850
+CurnVolume:
+ 171054.450
+CumSale : 18989346.490
+
+Nozzle No2
+Shift2Sale: 12080.400
+CumVo1:
+ 275912.820
+CumSale : 27916133.280
+''';
+
+      final res = OcrParserService.parseIndianOilReceipt(opticalSlip);
+
+      expect(res.success, isTrue);
+      expect(res.nozzleCumVolumeMl[1], equals(171054450));
+      expect(res.nozzleCumVolumeMl[2], equals(275912820));
+      expect(res.nozzleCumVolumeMl[1], isNot(equals(20951850)));
+      expect(res.nozzleCumVolumeMl[2], isNot(equals(12080400)));
+    });
+
+    test('9. Handles CumSale on the same line as CumVolume value without skipping', () {
+      const mergedLineSlip = '''
+IndianOil
+FP. ID : 1
+Pump SNo : 202501001272
+Date : 10/10/2026
+Time : 22:40:00
+
+Nozzle No1
+Shift2Sale: 20951.850
+CumVolume:
+171054.450 CumSale : 18989346.490
+
+Nozzle No2
+Shift2Sale: 12080.400
+CumVolume:
+275912.820 CumSale : 27916133.280
+''';
+
+      final res = OcrParserService.parseIndianOilReceipt(mergedLineSlip);
+
+      expect(res.success, isTrue);
+      expect(res.nozzleCumVolumeMl[1], equals(171054450));
+      expect(res.nozzleCumVolumeMl[2], equals(275912820));
+    });
+
+    test('10. Parses real IndianOil slip with Nozzle Noló, split header labels, and offset CumVolume', () {
+      const realSlip = '''
+FP. ID
+Date
+IndianOil
+Pump SNo :202501001346
+Time
+:3
+:10/10/2026
+:20:51:01
+Nozzle Noló
+shiflSale:7937.380
+shi flvol :67.520
+shif2sale: 12474.000
+shif2Vol :106.140
+shif3Sale:12926.350
+shif3vol :109.970
+shDaySale:
+33337.730
+shDayVol :283.630
+shMTHSale:
+450641.610
+86106. 490
+shMTHVol :3834.710
+CumVolume:
+CumSale :10038181.010
+Nozzle No2
+shif1sale:21825.610
+shiflvol :207.430
+Shif2Sale:22490.000
+shif2Vol :213. 720
+shif3sale:17995.770
+shif3Vol :171.030
+ShDaySale:
+62311.380
+ShDayVol :592.180
+ShMTHSale:
+580004. 620
+shMTHVol :5512.540
+Cumvolume:
+125635.400
+CumSale :12987914. 750
+''';
+
+      final res = OcrParserService.parseIndianOilReceipt(realSlip);
+
+      expect(res.success, isTrue);
+      expect(res.pumpSerialNumber, equals('202501001346'));
+      expect(res.fpId, equals('3'));
+      expect(res.printedDate, equals('10/10/2026'));
+      expect(res.printedTime, equals('20:51:01'));
+      expect(res.nozzleCumVolumeMl[1], equals(86106490));
+      expect(res.nozzleCumVolumeMl[2], equals(125635400));
+    });
   });
 }
